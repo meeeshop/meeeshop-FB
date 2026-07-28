@@ -1,6 +1,7 @@
 cryptography>=41.0.0
 requests>=2.31.0
 pillow>=10.0.0
-moviepy>=1.0.3
+moviepy==1.0.3
+proglog
 numpy>=1.24.0
 gTTS>=2.3.0

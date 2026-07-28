@@ -5,6 +5,7 @@ video_generator.py — Dynamic 6-Theme Vertical Video Reel Generator with Motion
 Features:
  - 6 distinct rotating visual Reel themes (9:16 vertical 1080x1920)
  - 4 Motion Animation Effects: float, wobble, spin, zoom-float (adapted from meeeshop-pinterest)
+ - Version-agnostic MoviePy 1.x & 2.x imports & audio helpers
  - Random background music track selection from audio/ directory (34 tracks)
  - Text-to-speech voiceover generation (gTTS) overlaid on background music
  - Dynamic audio mixing (30% music + 115% voiceover volume)
@@ -25,9 +26,53 @@ from secrets_manager import get_secret
 
 logger = logging.getLogger(__name__)
 
+# Version-agnostic MoviePy imports
+try:
+    from moviepy.editor import ImageSequenceClip, AudioFileClip, CompositeAudioClip
+except ImportError:
+    try:
+        from moviepy import ImageSequenceClip, AudioFileClip, CompositeAudioClip
+    except ImportError:
+        ImageSequenceClip = None
+        AudioFileClip = None
+        CompositeAudioClip = None
+
+
+def set_volume(audio_clip, factor: float):
+    if hasattr(audio_clip, 'volumex'):
+        return audio_clip.volumex(factor)
+    elif hasattr(audio_clip, 'with_volume'):
+        return audio_clip.with_volume(factor)
+    elif hasattr(audio_clip, 'multiply_volume'):
+        return audio_clip.multiply_volume(factor)
+    return audio_clip
+
+
+def attach_audio(video_clip, audio_clip):
+    if hasattr(video_clip, 'set_audio'):
+        return video_clip.set_audio(audio_clip)
+    elif hasattr(video_clip, 'with_audio'):
+        return video_clip.with_audio(audio_clip)
+    return video_clip
+
+
+def trim_clip(clip, start_t: float, end_t: float):
+    if hasattr(clip, 'subclip'):
+        return clip.subclip(start_t, end_t)
+    elif hasattr(clip, 'subclipped'):
+        return clip.subclipped(start_t, end_t)
+    return clip
+
+
+def loop_audio(audio_clip, target_duration: float):
+    if hasattr(audio_clip, 'loop'):
+        return audio_clip.loop(duration=target_duration)
+    elif hasattr(audio_clip, 'audio_loop'):
+        return audio_clip.audio_loop(duration=target_duration)
+    return audio_clip
+
 
 def create_gradient(width: int, height: int, color1: tuple, color2: tuple) -> Image.Image:
-    """Create a smooth vertical gradient image."""
     base = Image.new("RGBA", (width, height), color1)
     top = Image.new("RGBA", (width, height), color2)
     mask = Image.new("L", (width, height))
@@ -126,7 +171,6 @@ REEL_THEMES = [
 
 
 def calculate_motion_params(t: float, effect: str):
-    """Calculate scale, offset_x, offset_y, rotation angle based on motion effect."""
     scale = 1.0
     if effect == "float":
         return scale + (t * 0.02), 0, int(math.cos(t * 3) * 15), math.sin(t * 2) * 2
@@ -200,7 +244,6 @@ def render_theme_frame(raw_img: Image.Image, slide_index: int, total_slides: int
 
 
 def _pick_audio_track() -> str:
-    """Select a random background music track from the audio directory."""
     search_paths = [
         Path(__file__).resolve().parent.parent / "audio",
         Path(__file__).resolve().parent / "audio",
@@ -220,11 +263,8 @@ def _pick_audio_track() -> str:
 
 
 def generate_reel_video(product: dict, output_path: str = "output/generated_reel.mp4", theme_index: int = None) -> str:
-    """Generate a 9:16 vertical video reel with smooth Motion Effects, Background Music & Voiceover."""
-    try:
-        from moviepy.editor import ImageSequenceClip, AudioFileClip, CompositeAudioClip
-    except ImportError:
-        raise ImportError("moviepy is required for video generation. Run: pip install moviepy")
+    if ImageSequenceClip is None:
+        raise ImportError("moviepy is required for video generation. Run: pip install moviepy==1.0.3")
 
     brand_name = get_secret("BRAND_NAME", default="MEEESHOP").upper()
     public_domain = get_secret("PUBLIC_STORE_DOMAIN", default="us.meeeshop.com")
@@ -288,11 +328,11 @@ def generate_reel_video(product: dict, output_path: str = "output/generated_reel
         music_file = _pick_audio_track()
         if music_file:
             try:
-                bg_music = AudioFileClip(music_file).volumex(0.30)
+                bg_music = set_volume(AudioFileClip(music_file), 0.30)
                 if bg_music.duration < total_duration:
-                    bg_music = bg_music.loop(duration=total_duration)
+                    bg_music = loop_audio(bg_music, total_duration)
                 else:
-                    bg_music = bg_music.subclip(0, total_duration)
+                    bg_music = trim_clip(bg_music, 0, total_duration)
                 audio_tracks.append(bg_music)
                 logger.info("Mixed background music track into Reel.")
             except Exception as e:
@@ -306,10 +346,10 @@ def generate_reel_video(product: dict, output_path: str = "output/generated_reel
             vo_path = os.path.join(vo_temp_dir, "voiceover.mp3")
             
             gTTS(text=vo_text, lang="en", tld="us").save(vo_path)
-            vo_audio = AudioFileClip(vo_path).volumex(1.15)
+            vo_audio = set_volume(AudioFileClip(vo_path), 1.15)
             
             if vo_audio.duration > total_duration:
-                vo_audio = vo_audio.subclip(0, total_duration)
+                vo_audio = trim_clip(vo_audio, 0, total_duration)
                 
             audio_tracks.append(vo_audio)
             logger.info("Successfully generated and mixed voiceover audio (gTTS).")
@@ -318,7 +358,7 @@ def generate_reel_video(product: dict, output_path: str = "output/generated_reel
 
         # Combine audio tracks into clip
         if audio_tracks:
-            clip = clip.set_audio(CompositeAudioClip(audio_tracks))
+            clip = attach_audio(clip, CompositeAudioClip(audio_tracks))
 
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         clip.write_videofile(
