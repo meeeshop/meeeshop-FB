@@ -1,0 +1,344 @@
+#!/usr/bin/env python3
+"""
+video_generator.py — Dynamic 6-Theme Vertical Video Reel Generator with Motion Effects, Music & Voiceover.
+
+Features:
+ - 6 distinct rotating visual Reel themes (9:16 vertical 1080x1920)
+ - 4 Motion Animation Effects: float, wobble, spin, zoom-float (adapted from meeeshop-pinterest)
+ - Random background music track selection from audio/ directory (34 tracks)
+ - Text-to-speech voiceover generation (gTTS) overlaid on background music
+ - Dynamic audio mixing (30% music + 115% voiceover volume)
+ - 'FREE SHIPPING' callouts across all templates
+"""
+
+import os
+import math
+import random
+import shutil
+import logging
+import requests
+import tempfile
+from io import BytesIO
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from secrets_manager import get_secret
+
+logger = logging.getLogger(__name__)
+
+
+def create_gradient(width: int, height: int, color1: tuple, color2: tuple) -> Image.Image:
+    """Create a smooth vertical gradient image."""
+    base = Image.new("RGBA", (width, height), color1)
+    top = Image.new("RGBA", (width, height), color2)
+    mask = Image.new("L", (width, height))
+    mask_draw = ImageDraw.Draw(mask)
+    for y in range(height):
+        alpha = int(255 * (y / height))
+        mask_draw.line([(0, y), (width, y)], fill=alpha)
+    base.paste(top, (0, 0), mask)
+    return base
+
+
+def get_reel_fonts():
+    try:
+        f_brand = ImageFont.truetype("arialbd.ttf", 46)
+        f_hook = ImageFont.truetype("arialbd.ttf", 36)
+        f_price = ImageFont.truetype("arialbd.ttf", 48)
+        f_cta = ImageFont.truetype("arialbd.ttf", 38)
+        f_sub = ImageFont.truetype("arial.ttf", 26)
+    except IOError:
+        f_brand = ImageFont.load_default()
+        f_hook = ImageFont.load_default()
+        f_price = ImageFont.load_default()
+        f_cta = ImageFont.load_default()
+        f_sub = ImageFont.load_default()
+    return f_brand, f_hook, f_price, f_cta, f_sub
+
+
+REEL_THEMES = [
+    {
+        "name": "ken_burns_luxury",
+        "bg_colors": ((11, 12, 16, 255), (26, 29, 43, 255)),
+        "card_bg": (255, 255, 255, 255),
+        "header_color": "#007AFF",
+        "cta_color": "#007AFF",
+        "text_color": "#FFFFFF",
+        "accent_color": "#FF3B30",
+        "price_bg": "#28A745",
+        "hooks": ["🔥 VIRAL BESTSELLER | TRENDING NOW", "⚡ LIMITED STOCK AVAILABLE", "🎁 FREE SHIPPING ON ALL ORDERS"]
+    },
+    {
+        "name": "neon_cyber_flash",
+        "bg_colors": ((18, 8, 38, 255), (42, 18, 77, 255)),
+        "card_bg": (255, 255, 255, 255),
+        "header_color": "#FF007A",
+        "cta_color": "#00F0FF",
+        "text_color": "#00F0FF",
+        "accent_color": "#FF007A",
+        "price_bg": "#FF007A",
+        "hooks": ["⚡ FLASH SALE ALERT | DON'T MISS OUT", "🔥 TOP RATED CHOICE", "🎁 FREE SHIPPING | SHOP NOW"]
+    },
+    {
+        "name": "clean_minimal_studio",
+        "bg_colors": ((248, 246, 240, 255), (235, 230, 220, 255)),
+        "card_bg": (255, 255, 255, 255),
+        "header_color": "#111111",
+        "cta_color": "#111111",
+        "text_color": "#111111",
+        "accent_color": "#222222",
+        "price_bg": "#111111",
+        "hooks": ["✨ NEW ARRIVAL | STUDIO HIGHLIGHT", "💖 CUSTOMER FAVORITE", "🎁 FREE SHIPPING | ORDER TODAY"]
+    },
+    {
+        "name": "magazine_spotlight",
+        "bg_colors": ((9, 9, 11, 255), (20, 20, 25, 255)),
+        "card_bg": (255, 255, 255, 255),
+        "header_color": "#D4AF37",
+        "cta_color": "#D4AF37",
+        "text_color": "#FFFFFF",
+        "accent_color": "#D4AF37",
+        "price_bg": "#D4AF37",
+        "hooks": ["♦ MEEESHOP COLLECTION ♦", "🔥 TRENDING STYLE OF THE WEEK", "🎁 FREE SHIPPING | EXPLORE NOW"]
+    },
+    {
+        "name": "bold_retail_viral",
+        "bg_colors": ((30, 34, 42, 255), (45, 50, 60, 255)),
+        "card_bg": (255, 255, 255, 255),
+        "header_color": "#FFCC00",
+        "cta_color": "#FFCC00",
+        "text_color": "#FFFFFF",
+        "accent_color": "#E63946",
+        "price_bg": "#FFCC00",
+        "hooks": ["🔥 TRENDING ON SOCIAL MEDIA", "💰 SPECIAL PRICE OFFER", "🎁 FREE SHIPPING | ORDER TODAY"]
+    },
+    {
+        "name": "pastel_chic_aesthetic",
+        "bg_colors": ((253, 240, 240, 255), (250, 243, 224, 255)),
+        "card_bg": (255, 255, 255, 255),
+        "header_color": "#D87093",
+        "cta_color": "#D87093",
+        "text_color": "#8B008B",
+        "accent_color": "#C71585",
+        "price_bg": "#D87093",
+        "hooks": ["🌸 ESSENTIAL STYLE FAVORITE", "⭐ TOP RATED 5.0 STARS", "🎁 FREE SHIPPING | SHOP NOW"]
+    }
+]
+
+
+def calculate_motion_params(t: float, effect: str):
+    """Calculate scale, offset_x, offset_y, rotation angle based on motion effect."""
+    scale = 1.0
+    if effect == "float":
+        return scale + (t * 0.02), 0, int(math.cos(t * 3) * 15), math.sin(t * 2) * 2
+    elif effect == "wobble":
+        return scale + (t * 0.02), int(math.cos(t * 4) * 12), 0, math.sin(t * 4) * 3
+    elif effect == "spin":
+        return scale + (t * 0.03), 0, 0, t * 4
+    elif effect == "zoom-float":
+        return scale + (t * 0.04), 0, int(math.cos(t * 2) * 10), math.sin(t * 2) * 2
+    else:
+        return scale + (t * 0.02), 0, 0, 0
+
+
+def render_theme_frame(raw_img: Image.Image, slide_index: int, total_slides: int, step_index: int, max_steps: int, product: dict, brand_name: str, public_domain: str, theme: dict, effect_name: str) -> Image.Image:
+    width, height = 1080, 1920
+    canvas = create_gradient(width, height, theme["bg_colors"][0], theme["bg_colors"][1])
+
+    t = step_index / max_steps
+    scale_factor, offset_x, offset_y, angle = calculate_motion_params(t, effect_name)
+
+    card_w, card_h = 960, 1150
+    card_x, card_y = 60 + offset_x, 320 + offset_y
+
+    zoomed_w = max(10, int(raw_img.width * scale_factor))
+    zoomed_h = max(10, int(raw_img.height * scale_factor))
+    img_zoomed = raw_img.resize((zoomed_w, zoomed_h), Image.Resampling.LANCZOS)
+    img_zoomed.thumbnail((card_w - 40, card_h - 40), Image.Resampling.LANCZOS)
+
+    if angle != 0:
+        img_zoomed = img_zoomed.rotate(angle, resample=Image.BICUBIC, expand=True)
+
+    card = Image.new("RGBA", (card_w, card_h), theme["card_bg"])
+    zw, zh = img_zoomed.size
+    card.paste(img_zoomed, ((card_w - zw) // 2, (card_h - zh) // 2), img_zoomed)
+
+    canvas.paste(card, (card_x, card_y))
+    draw = ImageDraw.Draw(canvas)
+
+    f_brand, f_hook, f_price, f_cta, f_sub = get_reel_fonts()
+
+    title = product.get("title", "")
+    price = f"${product.get('price', '0.00')}"
+
+    draw.rounded_rectangle([60, 100, 1020, 200], radius=25, fill=theme["header_color"])
+    text_color = "#000000" if theme["header_color"] in ("#FFCC00", "#D4AF37", "#00F0FF") else "#FFFFFF"
+    draw.text((90, 126), f"✨ {brand_name}", fill=text_color, font=f_brand)
+
+    hook_text = theme["hooks"][min(slide_index, len(theme["hooks"]) - 1)]
+    draw.rounded_rectangle([60, 220, 1020, 290], radius=15, fill=theme["accent_color"])
+    draw.text((150, 238), hook_text, fill="white", font=f_hook)
+
+    price_text_color = "#000000" if theme["price_bg"] in ("#FFCC00", "#D4AF37") else "#FFFFFF"
+    draw.rounded_rectangle([660, 1400, 1020, 1490], radius=25, fill=theme["price_bg"])
+    draw.text((690, 1422), f"ONLY {price}", fill=price_text_color, font=f_price)
+
+    draw.rounded_rectangle([90, 1410, 480, 1480], radius=20, fill=(18, 22, 36, 230))
+    draw.text((110, 1432), "⭐ 5.0 (490+ Reviews)", fill="#FFD700", font=f_sub)
+
+    display_title = title if len(title) <= 42 else title[:40] + "..."
+    draw.text((60, 1530), display_title, fill=theme["text_color"], font=f_hook)
+
+    draw.rounded_rectangle([60, 1680, 1020, 1790], radius=30, fill=theme["cta_color"])
+    cta_text_color = "#000000" if theme["cta_color"] in ("#FFCC00", "#00F0FF") else "#FFFFFF"
+    cta_display = f"🛒 SHOP NOW AT  {public_domain.upper()}"
+    draw.text((120, 1718), cta_display, fill=cta_text_color, font=f_cta)
+
+    progress_w = int(1080 * ((slide_index + 1) / total_slides))
+    draw.rectangle([0, 0, progress_w, 15], fill="#FFD700")
+
+    return canvas.convert("RGB")
+
+
+def _pick_audio_track() -> str:
+    """Select a random background music track from the audio directory."""
+    search_paths = [
+        Path(__file__).resolve().parent.parent / "audio",
+        Path(__file__).resolve().parent / "audio",
+        Path("audio")
+    ]
+    tracks = []
+    for dir_path in search_paths:
+        if dir_path.exists() and dir_path.is_dir():
+            tracks.extend(list(dir_path.glob("*.mp3")) + list(dir_path.glob("*.wav")))
+    
+    if tracks:
+        selected = str(random.choice(tracks))
+        logger.info("Selected background music track: %s", os.path.basename(selected))
+        return selected
+    logger.warning("No audio tracks found in audio/ directory.")
+    return None
+
+
+def generate_reel_video(product: dict, output_path: str = "output/generated_reel.mp4", theme_index: int = None) -> str:
+    """Generate a 9:16 vertical video reel with smooth Motion Effects, Background Music & Voiceover."""
+    try:
+        from moviepy.editor import ImageSequenceClip, AudioFileClip, CompositeAudioClip
+    except ImportError:
+        raise ImportError("moviepy is required for video generation. Run: pip install moviepy")
+
+    brand_name = get_secret("BRAND_NAME", default="MEEESHOP").upper()
+    public_domain = get_secret("PUBLIC_STORE_DOMAIN", default="us.meeeshop.com")
+    
+    title = product.get("title", "Featured Item")
+    price = product.get("price", "0.00")
+
+    img_urls = product.get("images", [])[:3]
+    if not img_urls:
+        raise ValueError("Product has no images available for video reel generation.")
+
+    if theme_index is None or not (0 <= theme_index < len(REEL_THEMES)):
+        theme = random.choice(REEL_THEMES)
+    else:
+        theme = REEL_THEMES[theme_index]
+
+    effects = ["float", "wobble", "spin", "zoom-float"]
+    selected_effect = random.choice(effects)
+    logger.info("Selected Video Reel Theme: '%s' | Motion Effect: '%s'", theme["name"], selected_effect)
+
+    temp_dir = "temp_reel_frames"
+    os.makedirs(temp_dir, exist_ok=True)
+    all_frame_files = []
+
+    try:
+        frame_counter = 0
+        total_slides = len(img_urls)
+        frames_per_slide = 15
+
+        for slide_idx, url in enumerate(img_urls):
+            res = requests.get(url, timeout=15)
+            res.raise_for_status()
+            raw_img = Image.open(BytesIO(res.content)).convert("RGBA")
+
+            for step in range(frames_per_slide):
+                frame_img = render_theme_frame(
+                    raw_img=raw_img,
+                    slide_index=slide_idx,
+                    total_slides=total_slides,
+                    step_index=step,
+                    max_steps=frames_per_slide,
+                    product=product,
+                    brand_name=brand_name,
+                    public_domain=public_domain,
+                    theme=theme,
+                    effect_name=selected_effect
+                )
+
+                frame_path = os.path.join(temp_dir, f"frame_{frame_counter:04d}.jpg")
+                frame_img.save(frame_path, "JPEG", quality=95)
+                all_frame_files.append(frame_path)
+                frame_counter += 1
+
+        clip = ImageSequenceClip(all_frame_files, fps=12)
+        total_duration = clip.duration
+
+        # ── AUDIO MIXING ENGINE ──────────────────────────────────────────────
+        audio_tracks = []
+
+        # 1. Background Music (30% volume)
+        music_file = _pick_audio_track()
+        if music_file:
+            try:
+                bg_music = AudioFileClip(music_file).volumex(0.30)
+                if bg_music.duration < total_duration:
+                    bg_music = bg_music.loop(duration=total_duration)
+                else:
+                    bg_music = bg_music.subclip(0, total_duration)
+                audio_tracks.append(bg_music)
+                logger.info("Mixed background music track into Reel.")
+            except Exception as e:
+                logger.warning("Failed to mix background music: %s", str(e))
+
+        # 2. Text-to-Speech Voiceover (gTTS)
+        try:
+            from gtts import gTTS
+            vo_text = f"Discover the {title} at {brand_name} for only ${price}! Tap the link now for free shipping on all orders!"
+            vo_temp_dir = tempfile.mkdtemp()
+            vo_path = os.path.join(vo_temp_dir, "voiceover.mp3")
+            
+            gTTS(text=vo_text, lang="en", tld="us").save(vo_path)
+            vo_audio = AudioFileClip(vo_path).volumex(1.15)
+            
+            if vo_audio.duration > total_duration:
+                vo_audio = vo_audio.subclip(0, total_duration)
+                
+            audio_tracks.append(vo_audio)
+            logger.info("Successfully generated and mixed voiceover audio (gTTS).")
+        except Exception as e:
+            logger.warning("Voiceover generation skipped or failed: %s", str(e))
+
+        # Combine audio tracks into clip
+        if audio_tracks:
+            clip = clip.set_audio(CompositeAudioClip(audio_tracks))
+
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        clip.write_videofile(
+            output_path, 
+            fps=24, 
+            codec="libx264", 
+            audio_codec="aac", 
+            temp_audiofile="temp_audio.m4a",
+            remove_temp=True, 
+            logger=None
+        )
+
+        logger.info("Successfully generated video Reel with Audio & Voiceover (%s): %s", theme['name'], output_path)
+        return output_path
+
+    finally:
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    print("Multi-theme Reel video generator with Motion Effects, Audio & Voiceover ready.")

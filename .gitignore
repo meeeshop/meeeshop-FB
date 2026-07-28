@@ -1,0 +1,22 @@
+# Environment files containing local keys or decrypted secrets
+.env
+decrypted_secrets.json
+
+# Python bytecode / cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+env/
+venv/
+
+# Generated temporary media output
+temp_frames/
+generated_post.png
+generated_reel.mp4
+output/
+
+# OS metadata
+.DS_Store
+Thumbs.db
