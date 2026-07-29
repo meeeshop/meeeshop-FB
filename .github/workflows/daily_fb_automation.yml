@@ -6,6 +6,8 @@ on:
     # 17:00 UTC = 1:00 PM EST / 10:00 AM PST (Mid-day lunch break)
     # 00:00 UTC = 8:00 PM EST / 5:00 PM PST (Evening prime time Reels scrolling)
     - cron: '0 17,0 * * *'
+  push:
+    branches: [main, develop]
   workflow_dispatch: # Allows manual run anytime from GitHub Actions tab
 
 jobs:

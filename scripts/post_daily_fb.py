@@ -80,17 +80,24 @@ def run_daily_automation(dry_run: bool = False):
     # 5. Publish to Facebook Page Feed & Reels
     logger.info("Publishing generated content to Facebook...")
     
+    errors = []
     try:
         feed_res = publish_feed_photo(post_img_path, caption)
         logger.info("Feed Post Result: %s", feed_res)
     except Exception as e:
         logger.error("Error publishing Feed Post: %s", str(e))
+        errors.append(f"Feed Post: {e}")
 
     try:
         reel_res = publish_facebook_reel(reel_vid_path, caption)
         logger.info("Reel Result: %s", reel_res)
     except Exception as e:
         logger.error("Error publishing Facebook Reel: %s", str(e))
+        errors.append(f"Facebook Reel: {e}")
+
+    if errors:
+        logger.error("❌ meeeshop-FB Daily Automation Failed! %d publishing job(s) failed:\n - %s", len(errors), "\n - ".join(errors))
+        sys.exit(1)
 
     logger.info("🎉 meeeshop-FB Daily Automation Completed Successfully!")
 
