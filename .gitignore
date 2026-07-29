@@ -13,6 +13,8 @@ venv/
 
 # Generated temporary media output
 temp_frames/
+temp_reel_frames/
+temp_audio.m4a
 generated_post.png
 generated_reel.mp4
 output/
