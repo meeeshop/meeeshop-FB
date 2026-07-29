@@ -23,7 +23,7 @@ def fetch_shopify_products(store_url: str = None) -> list:
     clean_url = store_url.replace("https://", "").replace("http://", "").strip("/")
     endpoint = f"https://{clean_url}/products.json?limit=50"
     
-    logger.info("Fetching products from Shopify endpoint: https://%s/products.json", clean_url)
+    logger.info("Fetching products from Shopify endpoint: %s", endpoint)
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
