@@ -83,7 +83,7 @@ def render_style_1_luxury_dark(raw_img: Image.Image, product: dict, brand_name: 
     draw.rounded_rectangle([60, 45, 420, 110], radius=20, fill="#007AFF")
     draw.text((85, 63), f"✨ {brand_name}", fill="white", font=f_brand)
     draw.rounded_rectangle([660, 45, 1020, 110], radius=20, fill="#FF3B30")
-    draw.text((680, 65), "🔥 TRENDING PICK", fill="white", font=f_badge)
+    draw.text((680, 65), "🔥 OOTD | SHOP THE LOOK", fill="white", font=f_badge)
 
     price = f"${product.get('price', '0.00')}"
     draw.rounded_rectangle([130, 800, 440, 855], radius=15, fill=(18, 22, 36, 230))
@@ -118,7 +118,7 @@ def render_style_2_editorial_minimal(raw_img: Image.Image, product: dict, brand_
 
     draw.text((60, 55), brand_name, fill="#111111", font=f_brand)
     draw.rounded_rectangle([720, 50, 1020, 110], radius=10, fill="#111111")
-    draw.text((745, 68), "NEW EDITION", fill="white", font=f_small)
+    draw.text((745, 68), "✨ NEW DROP", fill="white", font=f_small)
 
     price = f"${product.get('price', '0.00')}"
     draw.rounded_rectangle([700, 780, 950, 845], radius=10, fill="#111111")
@@ -152,7 +152,7 @@ def render_style_3_neon_cyber_flash(raw_img: Image.Image, product: dict, brand_n
     draw.text((85, 63), f"⚡ {brand_name}", fill="white", font=f_brand)
 
     draw.rounded_rectangle([640, 45, 1020, 110], radius=20, fill="#00F0FF")
-    draw.text((665, 65), "⚡ FLASH SALE ALERT", fill="#120826", font=f_badge)
+    draw.text((665, 65), "⚡ TRENDING | GET IT NOW", fill="#120826", font=f_badge)
 
     price = f"${product.get('price', '0.00')}"
     draw.rounded_rectangle([650, 780, 950, 850], radius=20, fill="#FF007A")
@@ -186,7 +186,7 @@ def render_style_4_pastel_chic(raw_img: Image.Image, product: dict, brand_name: 
     draw.text((85, 63), f"🌸 {brand_name}", fill="white", font=f_brand)
 
     draw.rounded_rectangle([660, 45, 1020, 110], radius=20, fill="#C71585")
-    draw.text((680, 65), "✨ ESSENTIAL PICK", fill="white", font=f_badge)
+    draw.text((680, 65), "💖 ROMANTIC ERA", fill="white", font=f_badge)
 
     price = f"${product.get('price', '0.00')}"
     draw.rounded_rectangle([650, 780, 950, 850], radius=20, fill="#D87093")
@@ -220,7 +220,7 @@ def render_style_5_bold_retail_deal(raw_img: Image.Image, product: dict, brand_n
     draw.text((85, 63), f"🔥 {brand_name} DEALS", fill="#000000", font=f_brand)
 
     draw.rounded_rectangle([640, 45, 1020, 110], radius=15, fill="#E63946")
-    draw.text((670, 65), "FREE SHIPPING", fill="white", font=f_badge)
+    draw.text((670, 65), "💰 FASHION STEAL", fill="white", font=f_badge)
 
     price = f"${product.get('price', '0.00')}"
     draw.rounded_rectangle([650, 780, 950, 850], radius=15, fill="#FFCC00")
@@ -254,7 +254,7 @@ def render_style_6_magazine_showcase(raw_img: Image.Image, product: dict, brand_
 
     f_brand, f_title, f_price, f_small, f_badge, f_cta = get_fonts()
 
-    draw.text((70, 70), f"♦ {brand_name} COLLECTION ♦", fill="#D4AF37", font=f_brand)
+    draw.text((70, 70), f"♦ STYLE TIPS | {brand_name} ♦", fill="#D4AF37", font=f_brand)
 
     price = f"${product.get('price', '0.00')}"
     draw.rounded_rectangle([660, 780, 950, 845], radius=10, fill="#D4AF37")

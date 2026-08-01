@@ -102,70 +102,70 @@ def get_reel_fonts():
 
 REEL_THEMES = [
     {
-        "name": "ken_burns_luxury",
-        "bg_colors": ((11, 12, 16, 255), (26, 29, 43, 255)),
+        "name": "ootd_look",
+        "bg_colors": ((248, 240, 235, 255), (250, 245, 235, 255)),
         "card_bg": (255, 255, 255, 255),
-        "header_color": "#007AFF",
-        "cta_color": "#007AFF",
-        "text_color": "#FFFFFF",
-        "accent_color": "#FF3B30",
-        "price_bg": "#28A745",
-        "hooks": ["🔥 VIRAL BESTSELLER | TRENDING NOW", "⚡ LIMITED STOCK AVAILABLE", "🎁 FREE SHIPPING ON ALL ORDERS"]
+        "header_color": "#FFC832",
+        "cta_color": "#FFC832",
+        "text_color": "#111111",
+        "accent_color": "#333333",
+        "price_bg": "#FFC832",
+        "hooks": ["🔥 OOTD | SHOP THE LOOK", "✨ DAILY STYLE INSPO", "🎁 FREE SHIPPING TODAY"]
     },
     {
-        "name": "neon_cyber_flash",
-        "bg_colors": ((18, 8, 38, 255), (42, 18, 77, 255)),
+        "name": "trending_now",
+        "bg_colors": ((235, 248, 240, 255), (235, 245, 250, 255)),
         "card_bg": (255, 255, 255, 255),
-        "header_color": "#FF007A",
-        "cta_color": "#00F0FF",
-        "text_color": "#00F0FF",
-        "accent_color": "#FF007A",
-        "price_bg": "#FF007A",
-        "hooks": ["⚡ FLASH SALE ALERT | DON'T MISS OUT", "🔥 TOP RATED CHOICE", "🎁 FREE SHIPPING | SHOP NOW"]
-    },
-    {
-        "name": "clean_minimal_studio",
-        "bg_colors": ((248, 246, 240, 255), (235, 230, 220, 255)),
-        "card_bg": (255, 255, 255, 255),
-        "header_color": "#111111",
-        "cta_color": "#111111",
+        "header_color": "#FF3264",
+        "cta_color": "#FF3264",
         "text_color": "#111111",
         "accent_color": "#222222",
-        "price_bg": "#111111",
-        "hooks": ["✨ NEW ARRIVAL | STUDIO HIGHLIGHT", "💖 CUSTOMER FAVORITE", "🎁 FREE SHIPPING | ORDER TODAY"]
+        "price_bg": "#FF3264",
+        "hooks": ["🔥 TRENDING | GET IT NOW", "⚡ VIRAL ON PINTEREST", "🎁 FREE SHIPPING INCLUDED"]
     },
     {
-        "name": "magazine_spotlight",
-        "bg_colors": ((9, 9, 11, 255), (20, 20, 25, 255)),
-        "card_bg": (255, 255, 255, 255),
-        "header_color": "#D4AF37",
-        "cta_color": "#D4AF37",
-        "text_color": "#FFFFFF",
-        "accent_color": "#D4AF37",
-        "price_bg": "#D4AF37",
-        "hooks": ["♦ MEEESHOP COLLECTION ♦", "🔥 TRENDING STYLE OF THE WEEK", "🎁 FREE SHIPPING | EXPLORE NOW"]
-    },
-    {
-        "name": "bold_retail_viral",
+        "name": "new_drop",
         "bg_colors": ((30, 34, 42, 255), (45, 50, 60, 255)),
         "card_bg": (255, 255, 255, 255),
-        "header_color": "#FFCC00",
-        "cta_color": "#FFCC00",
+        "header_color": "#32C864",
+        "cta_color": "#32C864",
         "text_color": "#FFFFFF",
-        "accent_color": "#E63946",
-        "price_bg": "#FFCC00",
-        "hooks": ["🔥 TRENDING ON SOCIAL MEDIA", "💰 SPECIAL PRICE OFFER", "🎁 FREE SHIPPING | ORDER TODAY"]
+        "accent_color": "#111111",
+        "price_bg": "#32C864",
+        "hooks": ["✨ NEW DROP | SHOP BEFORE IT'S GONE", "🔥 FRESH ARRIVALS", "🎁 FAST & FREE SHIPPING"]
     },
     {
-        "name": "pastel_chic_aesthetic",
-        "bg_colors": ((253, 240, 240, 255), (250, 243, 224, 255)),
+        "name": "style_tips",
+        "bg_colors": ((240, 235, 248, 255), (240, 240, 248, 255)),
         "card_bg": (255, 255, 255, 255),
-        "header_color": "#D87093",
-        "cta_color": "#D87093",
-        "text_color": "#8B008B",
-        "accent_color": "#C71585",
-        "price_bg": "#D87093",
-        "hooks": ["🌸 ESSENTIAL STYLE FAVORITE", "⭐ TOP RATED 5.0 STARS", "🎁 FREE SHIPPING | SHOP NOW"]
+        "header_color": "#50A0FF",
+        "cta_color": "#50A0FF",
+        "text_color": "#111111",
+        "accent_color": "#222222",
+        "price_bg": "#50A0FF",
+        "hooks": ["💡 STYLE TIPS | SEE ALL STYLES", "⭐ TOP RATED 5.0 STARS", "🎁 FREE SHIPPING | SHOP NOW"]
+    },
+    {
+        "name": "fashion_steal",
+        "bg_colors": ((245, 238, 230, 255), (248, 240, 235, 255)),
+        "card_bg": (255, 255, 255, 255),
+        "header_color": "#FF8232",
+        "cta_color": "#FF8232",
+        "text_color": "#111111",
+        "accent_color": "#333333",
+        "price_bg": "#FF8232",
+        "hooks": ["💰 FASHION STEAL | GRAB THIS DEAL", "🔥 LIMITED TIME OFFER", "🎁 FREE SHIPPING | ORDER TODAY"]
+    },
+    {
+        "name": "romantic_era",
+        "bg_colors": ((248, 235, 240, 255), (253, 240, 240, 255)),
+        "card_bg": (255, 255, 255, 255),
+        "header_color": "#731E46",
+        "cta_color": "#731E46",
+        "text_color": "#111111",
+        "accent_color": "#4A142D",
+        "price_bg": "#731E46",
+        "hooks": ["💖 ROMANTIC ERA | ELEVATE YOUR LOOK", "✨ ESSENTIAL STYLE FAVORITE", "🎁 FREE SHIPPING | SHOP NOW"]
     }
 ]
 
@@ -215,14 +215,14 @@ def render_theme_frame(raw_img: Image.Image, slide_index: int, total_slides: int
     price = f"${product.get('price', '0.00')}"
 
     draw.rounded_rectangle([60, 100, 1020, 200], radius=25, fill=theme["header_color"])
-    text_color = "#000000" if theme["header_color"] in ("#FFCC00", "#D4AF37", "#00F0FF") else "#FFFFFF"
+    text_color = "#000000" if theme["header_color"] in ("#FFC832", "#32C864") else "#FFFFFF"
     draw.text((90, 126), f"✨ {brand_name}", fill=text_color, font=f_brand)
 
     hook_text = theme["hooks"][min(slide_index, len(theme["hooks"]) - 1)]
     draw.rounded_rectangle([60, 220, 1020, 290], radius=15, fill=theme["accent_color"])
     draw.text((150, 238), hook_text, fill="white", font=f_hook)
 
-    price_text_color = "#000000" if theme["price_bg"] in ("#FFCC00", "#D4AF37") else "#FFFFFF"
+    price_text_color = "#000000" if theme["price_bg"] in ("#FFC832", "#32C864") else "#FFFFFF"
     draw.rounded_rectangle([660, 1400, 1020, 1490], radius=25, fill=theme["price_bg"])
     draw.text((690, 1422), f"ONLY {price}", fill=price_text_color, font=f_price)
 
@@ -233,7 +233,7 @@ def render_theme_frame(raw_img: Image.Image, slide_index: int, total_slides: int
     draw.text((60, 1530), display_title, fill=theme["text_color"], font=f_hook)
 
     draw.rounded_rectangle([60, 1680, 1020, 1790], radius=30, fill=theme["cta_color"])
-    cta_text_color = "#000000" if theme["cta_color"] in ("#FFCC00", "#00F0FF") else "#FFFFFF"
+    cta_text_color = "#000000" if theme["cta_color"] in ("#FFC832", "#32C864") else "#FFFFFF"
     cta_display = f"🛒 SHOP NOW AT  {public_domain.upper()}"
     draw.text((120, 1718), cta_display, fill=cta_text_color, font=f_cta)
 
