@@ -215,14 +215,14 @@ def render_theme_frame(raw_img: Image.Image, slide_index: int, total_slides: int
     price = f"${product.get('price', '0.00')}"
 
     draw.rounded_rectangle([60, 100, 1020, 200], radius=25, fill=theme["header_color"])
-    text_color = "#000000" if theme["header_color"] in ("#FFC832", "#32C864") else "#FFFFFF"
+    text_color = "#000000" if theme["header_color"] in ("#FFC832", "#32C864", "#FF8232", "#50A0FF") else "#FFFFFF"
     draw.text((90, 126), f"✨ {brand_name}", fill=text_color, font=f_brand)
 
     hook_text = theme["hooks"][min(slide_index, len(theme["hooks"]) - 1)]
     draw.rounded_rectangle([60, 220, 1020, 290], radius=15, fill=theme["accent_color"])
     draw.text((150, 238), hook_text, fill="white", font=f_hook)
 
-    price_text_color = "#000000" if theme["price_bg"] in ("#FFC832", "#32C864") else "#FFFFFF"
+    price_text_color = "#000000" if theme["price_bg"] in ("#FFC832", "#32C864", "#FF8232", "#50A0FF") else "#FFFFFF"
     draw.rounded_rectangle([660, 1400, 1020, 1490], radius=25, fill=theme["price_bg"])
     draw.text((690, 1422), f"ONLY {price}", fill=price_text_color, font=f_price)
 
@@ -230,10 +230,11 @@ def render_theme_frame(raw_img: Image.Image, slide_index: int, total_slides: int
     draw.text((110, 1432), "⭐ 5.0 (490+ Reviews)", fill="#FFD700", font=f_sub)
 
     display_title = title if len(title) <= 42 else title[:40] + "..."
-    draw.text((60, 1530), display_title, fill=theme["text_color"], font=f_hook)
+    draw.rounded_rectangle([40, 1510, 1040, 1590], radius=15, fill=(0, 0, 0, 160))
+    draw.text((60, 1530), display_title, fill="#FFFFFF", font=f_hook)
 
     draw.rounded_rectangle([60, 1680, 1020, 1790], radius=30, fill=theme["cta_color"])
-    cta_text_color = "#000000" if theme["cta_color"] in ("#FFC832", "#32C864") else "#FFFFFF"
+    cta_text_color = "#000000" if theme["cta_color"] in ("#FFC832", "#32C864", "#FF8232", "#50A0FF") else "#FFFFFF"
     cta_display = f"🛒 SHOP NOW AT  {public_domain.upper()}"
     draw.text((120, 1718), cta_display, fill=cta_text_color, font=f_cta)
 

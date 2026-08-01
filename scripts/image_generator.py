@@ -94,6 +94,7 @@ def render_style_1_luxury_dark(raw_img: Image.Image, product: dict, brand_name: 
 
     display_title = product.get("title", "")
     if len(display_title) > 42: display_title = display_title[:40] + "..."
+    draw.rounded_rectangle([40, 875, 1040, 945], radius=15, fill=(0, 0, 0, 180))
     draw.text((60, 890), display_title, fill="white", font=f_title)
 
     draw.rounded_rectangle([60, 955, 1020, 1045], radius=25, fill="#007AFF")
@@ -126,6 +127,7 @@ def render_style_2_editorial_minimal(raw_img: Image.Image, product: dict, brand_
 
     display_title = product.get("title", "")
     if len(display_title) > 40: display_title = display_title[:38] + "..."
+    draw.rounded_rectangle([40, 875, 1040, 945], radius=15, fill=(255, 255, 255, 220))
     draw.text((60, 890), display_title, fill="#111111", font=f_title)
 
     draw.rounded_rectangle([60, 955, 1020, 1045], radius=15, fill="#111111")
@@ -160,6 +162,7 @@ def render_style_3_neon_cyber_flash(raw_img: Image.Image, product: dict, brand_n
 
     display_title = product.get("title", "")
     if len(display_title) > 42: display_title = display_title[:40] + "..."
+    draw.rounded_rectangle([40, 875, 1040, 945], radius=15, fill=(18, 8, 38, 200))
     draw.text((60, 890), display_title, fill="#00F0FF", font=f_title)
 
     draw.rounded_rectangle([60, 955, 1020, 1045], radius=25, fill="#00F0FF")
@@ -194,6 +197,7 @@ def render_style_4_pastel_chic(raw_img: Image.Image, product: dict, brand_name: 
 
     display_title = product.get("title", "")
     if len(display_title) > 42: display_title = display_title[:40] + "..."
+    draw.rounded_rectangle([40, 875, 1040, 945], radius=15, fill=(255, 255, 255, 200))
     draw.text((60, 890), display_title, fill="#8B008B", font=f_title)
 
     draw.rounded_rectangle([60, 955, 1020, 1045], radius=25, fill="#D87093")
@@ -228,6 +232,7 @@ def render_style_5_bold_retail_deal(raw_img: Image.Image, product: dict, brand_n
 
     display_title = product.get("title", "")
     if len(display_title) > 42: display_title = display_title[:40] + "..."
+    draw.rounded_rectangle([40, 875, 1040, 945], radius=15, fill=(0, 0, 0, 180))
     draw.text((60, 890), display_title, fill="white", font=f_title)
 
     draw.rounded_rectangle([60, 955, 1020, 1045], radius=20, fill="#FFCC00")
@@ -262,6 +267,7 @@ def render_style_6_magazine_showcase(raw_img: Image.Image, product: dict, brand_
 
     display_title = product.get("title", "")
     if len(display_title) > 42: display_title = display_title[:40] + "..."
+    draw.rounded_rectangle([50, 875, 1030, 945], radius=15, fill=(0, 0, 0, 200))
     draw.text((70, 890), display_title, fill="#FFFFFF", font=f_title)
 
     draw.rounded_rectangle([70, 955, 1010, 1030], radius=15, fill="#D4AF37")
