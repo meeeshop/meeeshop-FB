@@ -86,11 +86,11 @@ def create_gradient(width: int, height: int, color1: tuple, color2: tuple) -> Im
 
 def get_reel_fonts():
     try:
-        f_brand = ImageFont.truetype("arialbd.ttf", 64)
-        f_hook = ImageFont.truetype("arialbd.ttf", 54)
-        f_price = ImageFont.truetype("arialbd.ttf", 72)
-        f_cta = ImageFont.truetype("arialbd.ttf", 56)
-        f_sub = ImageFont.truetype("arial.ttf", 36)
+        f_brand = ImageFont.truetype("arialbd.ttf", 108)
+        f_hook = ImageFont.truetype("arialbd.ttf", 92)
+        f_price = ImageFont.truetype("arialbd.ttf", 122)
+        f_cta = ImageFont.truetype("arialbd.ttf", 95)
+        f_sub = ImageFont.truetype("arial.ttf", 61)
     except IOError:
         f_brand = ImageFont.load_default()
         f_hook = ImageFont.load_default()
@@ -191,8 +191,8 @@ def render_theme_frame(raw_img: Image.Image, slide_index: int, total_slides: int
     t = step_index / max_steps
     scale_factor, offset_x, offset_y, angle = calculate_motion_params(t, effect_name)
 
-    card_w, card_h = 960, 1150
-    card_x, card_y = 60 + offset_x, 320 + offset_y
+    card_w, card_h = 960, 1000
+    card_x, card_y = 60 + offset_x, 360 + offset_y
 
     zoomed_w = max(10, int(raw_img.width * scale_factor))
     zoomed_h = max(10, int(raw_img.height * scale_factor))
@@ -214,29 +214,29 @@ def render_theme_frame(raw_img: Image.Image, slide_index: int, total_slides: int
     title = product.get("title", "")
     price = f"${product.get('price', '0.00')}"
 
-    draw.rounded_rectangle([60, 100, 1020, 200], radius=25, fill=theme["header_color"])
+    draw.rounded_rectangle([40, 80, 1040, 220], radius=25, fill=theme["header_color"])
     text_color = "#000000" if theme["header_color"] in ("#FFC832", "#32C864", "#FF8232", "#50A0FF") else "#FFFFFF"
-    draw.text((90, 126), f"✨ {brand_name}", fill=text_color, font=f_brand)
+    draw.text((70, 95), f"✨ {brand_name}", fill=text_color, font=f_brand)
 
     hook_text = theme["hooks"][min(slide_index, len(theme["hooks"]) - 1)]
-    draw.rounded_rectangle([60, 220, 1020, 290], radius=15, fill=theme["accent_color"])
-    draw.text((150, 238), hook_text, fill="white", font=f_hook)
+    draw.rounded_rectangle([40, 235, 1040, 345], radius=15, fill=theme["accent_color"])
+    draw.text((70, 250), hook_text, fill="white", font=f_hook)
 
     price_text_color = "#000000" if theme["price_bg"] in ("#FFC832", "#32C864", "#FF8232", "#50A0FF") else "#FFFFFF"
-    draw.rounded_rectangle([660, 1400, 1020, 1490], radius=25, fill=theme["price_bg"])
-    draw.text((690, 1422), f"ONLY {price}", fill=price_text_color, font=f_price)
+    draw.rounded_rectangle([580, 1370, 1040, 1510], radius=25, fill=theme["price_bg"])
+    draw.text((610, 1385), f"ONLY {price}", fill=price_text_color, font=f_price)
 
-    draw.rounded_rectangle([90, 1410, 480, 1480], radius=20, fill=(18, 22, 36, 230))
-    draw.text((110, 1432), "⭐ 5.0 (490+ Reviews)", fill="#FFD700", font=f_sub)
+    draw.rounded_rectangle([40, 1390, 560, 1490], radius=20, fill=(18, 22, 36, 230))
+    draw.text((60, 1410), "⭐ 5.0 (490+ Reviews)", fill="#FFD700", font=f_sub)
 
-    display_title = title if len(title) <= 42 else title[:40] + "..."
-    draw.rounded_rectangle([40, 1510, 1040, 1590], radius=15, fill=(0, 0, 0, 160))
-    draw.text((60, 1530), display_title, fill="#FFFFFF", font=f_hook)
+    display_title = title if len(title) <= 26 else title[:24] + "..."
+    draw.rounded_rectangle([40, 1525, 1040, 1640], radius=25, fill=(0, 0, 0, 180))
+    draw.text((60, 1535), display_title, fill="#FFFFFF", font=f_hook)
 
-    draw.rounded_rectangle([60, 1680, 1020, 1790], radius=30, fill=theme["cta_color"])
+    draw.rounded_rectangle([40, 1660, 1040, 1820], radius=35, fill=theme["cta_color"])
     cta_text_color = "#000000" if theme["cta_color"] in ("#FFC832", "#32C864", "#FF8232", "#50A0FF") else "#FFFFFF"
-    cta_display = f"🛒 SHOP NOW AT  {public_domain.upper()}"
-    draw.text((120, 1718), cta_display, fill=cta_text_color, font=f_cta)
+    cta_display = f"🛒 SHOP: {public_domain.upper()}"
+    draw.text((80, 1690), cta_display, fill=cta_text_color, font=f_cta)
 
     progress_w = int(1080 * ((slide_index + 1) / total_slides))
     draw.rectangle([0, 0, progress_w, 15], fill="#FFD700")

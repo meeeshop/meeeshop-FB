@@ -38,12 +38,12 @@ def create_gradient(width: int, height: int, color1: tuple, color2: tuple) -> Im
 def get_fonts():
     """Load standard fonts with fallback."""
     try:
-        font_brand = ImageFont.truetype("arialbd.ttf", 52)
-        font_title = ImageFont.truetype("arialbd.ttf", 48)
-        font_price = ImageFont.truetype("arialbd.ttf", 64)
-        font_small = ImageFont.truetype("arial.ttf", 34)
-        font_badge = ImageFont.truetype("arialbd.ttf", 38)
-        font_cta = ImageFont.truetype("arialbd.ttf", 50)
+        font_brand = ImageFont.truetype("arialbd.ttf", 88)
+        font_title = ImageFont.truetype("arialbd.ttf", 82)
+        font_price = ImageFont.truetype("arialbd.ttf", 108)
+        font_small = ImageFont.truetype("arial.ttf", 58)
+        font_badge = ImageFont.truetype("arialbd.ttf", 65)
+        font_cta = ImageFont.truetype("arialbd.ttf", 85)
     except IOError:
         font_brand = ImageFont.load_default()
         font_title = ImageFont.load_default()
@@ -93,9 +93,9 @@ def render_style_1_luxury_dark(raw_img: Image.Image, product: dict, brand_name: 
     draw.text((700, 800), f"ONLY {price}", fill="white", font=f_price)
 
     display_title = product.get("title", "")
-    if len(display_title) > 42: display_title = display_title[:40] + "..."
-    draw.rounded_rectangle([40, 875, 1040, 945], radius=15, fill=(0, 0, 0, 180))
-    draw.text((60, 890), display_title, fill="white", font=f_title)
+    if len(display_title) > 28: display_title = display_title[:25] + "..."
+    draw.rounded_rectangle([30, 850, 1050, 960], radius=15, fill=(0, 0, 0, 180))
+    draw.text((50, 865), display_title, fill="white", font=f_title)
 
     draw.rounded_rectangle([60, 955, 1020, 1045], radius=25, fill="#007AFF")
     draw.text((160, 982), f"🛒 SHOP NOW AT  {public_domain.upper()} ➔", fill="white", font=f_cta)
@@ -126,9 +126,9 @@ def render_style_2_editorial_minimal(raw_img: Image.Image, product: dict, brand_
     draw.text((730, 795), price, fill="#FFFFFF", font=f_price)
 
     display_title = product.get("title", "")
-    if len(display_title) > 40: display_title = display_title[:38] + "..."
-    draw.rounded_rectangle([40, 875, 1040, 945], radius=15, fill=(255, 255, 255, 220))
-    draw.text((60, 890), display_title, fill="#111111", font=f_title)
+    if len(display_title) > 28: display_title = display_title[:25] + "..."
+    draw.rounded_rectangle([30, 850, 1050, 960], radius=15, fill=(255, 255, 255, 220))
+    draw.text((50, 865), display_title, fill="#111111", font=f_title)
 
     draw.rounded_rectangle([60, 955, 1020, 1045], radius=15, fill="#111111")
     draw.text((200, 982), f"VISIT {public_domain.upper()}  |  FREE SHIPPING", fill="#FFFFFF", font=f_cta)
@@ -161,9 +161,9 @@ def render_style_3_neon_cyber_flash(raw_img: Image.Image, product: dict, brand_n
     draw.text((680, 795), price, fill="#FFFFFF", font=f_price)
 
     display_title = product.get("title", "")
-    if len(display_title) > 42: display_title = display_title[:40] + "..."
-    draw.rounded_rectangle([40, 875, 1040, 945], radius=15, fill=(18, 8, 38, 200))
-    draw.text((60, 890), display_title, fill="#00F0FF", font=f_title)
+    if len(display_title) > 28: display_title = display_title[:25] + "..."
+    draw.rounded_rectangle([30, 850, 1050, 960], radius=15, fill=(18, 8, 38, 200))
+    draw.text((50, 865), display_title, fill="#00F0FF", font=f_title)
 
     draw.rounded_rectangle([60, 955, 1020, 1045], radius=25, fill="#00F0FF")
     draw.text((150, 982), f"⚡ SHOP NOW: {public_domain.upper()} ➔", fill="#120826", font=f_cta)
@@ -196,9 +196,9 @@ def render_style_4_pastel_chic(raw_img: Image.Image, product: dict, brand_name: 
     draw.text((690, 795), price, fill="#FFFFFF", font=f_price)
 
     display_title = product.get("title", "")
-    if len(display_title) > 42: display_title = display_title[:40] + "..."
-    draw.rounded_rectangle([40, 875, 1040, 945], radius=15, fill=(255, 255, 255, 200))
-    draw.text((60, 890), display_title, fill="#8B008B", font=f_title)
+    if len(display_title) > 28: display_title = display_title[:25] + "..."
+    draw.rounded_rectangle([30, 850, 1050, 960], radius=15, fill=(255, 255, 255, 200))
+    draw.text((50, 865), display_title, fill="#8B008B", font=f_title)
 
     draw.rounded_rectangle([60, 955, 1020, 1045], radius=25, fill="#D87093")
     draw.text((180, 982), f"🌸 SHOP NOW AT {public_domain.upper()}", fill="white", font=f_cta)
@@ -266,9 +266,9 @@ def render_style_6_magazine_showcase(raw_img: Image.Image, product: dict, brand_
     draw.text((690, 795), price, fill="#000000", font=f_price)
 
     display_title = product.get("title", "")
-    if len(display_title) > 42: display_title = display_title[:40] + "..."
-    draw.rounded_rectangle([50, 875, 1030, 945], radius=15, fill=(0, 0, 0, 200))
-    draw.text((70, 890), display_title, fill="#FFFFFF", font=f_title)
+    if len(display_title) > 28: display_title = display_title[:25] + "..."
+    draw.rounded_rectangle([40, 850, 1040, 960], radius=15, fill=(0, 0, 0, 200))
+    draw.text((60, 865), display_title, fill="#FFFFFF", font=f_title)
 
     draw.rounded_rectangle([70, 955, 1010, 1030], radius=15, fill="#D4AF37")
     draw.text((200, 975), f"EXPLORE AT {public_domain.upper()} ➔", fill="#000000", font=f_cta)
