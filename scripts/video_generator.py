@@ -1,385 +1,478 @@
 #!/usr/bin/env python3
-"""
-video_generator.py — Dynamic 6-Theme Vertical Video Reel Generator with Motion Effects, Music & Voiceover.
-
-Features:
- - 6 distinct rotating visual Reel themes (9:16 vertical 1080x1920)
- - 4 Motion Animation Effects: float, wobble, spin, zoom-float (adapted from meeeshop-pinterest)
- - Version-agnostic MoviePy 1.x & 2.x imports & audio helpers
- - Random background music track selection from audio/ directory (34 tracks)
- - Text-to-speech voiceover generation (gTTS) overlaid on background music
- - Dynamic audio mixing (30% music + 115% voiceover volume)
- - 'FREE SHIPPING' callouts across all templates
-"""
-
-import os
-import math
-import random
-import shutil
-import logging
-import requests
-import tempfile
-from io import BytesIO
+import os, glob, io, random, time, tempfile, textwrap
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
-from secrets_manager import get_secret
+from typing import Any, Dict, List, Optional, Tuple
+import numpy as np
+import requests
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageFilter
+from moviepy.editor import AudioFileClip, CompositeAudioClip, VideoClip, concatenate_videoclips
+import logging
 
 logger = logging.getLogger(__name__)
 
-# Version-agnostic MoviePy imports
-try:
-    from moviepy.editor import ImageSequenceClip, AudioFileClip, CompositeAudioClip
-except ImportError:
-    try:
-        from moviepy import ImageSequenceClip, AudioFileClip, CompositeAudioClip
-    except ImportError:
-        ImageSequenceClip = None
-        AudioFileClip = None
-        CompositeAudioClip = None
+from secrets_manager import get_secret
 
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
 
-def set_volume(audio_clip, factor: float):
-    if hasattr(audio_clip, 'volumex'):
-        return audio_clip.volumex(factor)
-    elif hasattr(audio_clip, 'with_volume'):
-        return audio_clip.with_volume(factor)
-    elif hasattr(audio_clip, 'multiply_volume'):
-        return audio_clip.multiply_volume(factor)
-    return audio_clip
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
+VIDEO_HISTORY_FILE = Path(__file__).parent / "video_posting_history.json"
+VIDEO_REPOST_COOLDOWN_DAYS = 10
+_AUDIO_DIR = Path(__file__).parent / "audio"
 
-def attach_audio(video_clip, audio_clip):
-    if hasattr(video_clip, 'set_audio'):
-        return video_clip.set_audio(audio_clip)
-    elif hasattr(video_clip, 'with_audio'):
-        return video_clip.with_audio(audio_clip)
-    return video_clip
+MAX_PINS_PER_RUN = int(os.getenv("MAX_PINS_PER_RUN", "3"))
+DRY_RUN = os.getenv("DRY_RUN", "false").lower() in ("1", "true", "yes")
+MAX_VIDEO_SIZE_MB = 100
+BRAND_NAME = os.getenv("BRAND_NAME", "MeeeShop US Boutique")
+GTTS_TLD = "com"  # US Accent for gTTS voiceover
+GTTS_LANG = "en"
 
+# Pinterest pin creation endpoint (web-UI flow — no OAuth app needed)
+_PINTEREST_PIN_URL = "https://www.pinterest.com/resource/PinResource/create/"
 
-def trim_clip(clip, start_t: float, end_t: float):
-    if hasattr(clip, 'subclip'):
-        return clip.subclip(start_t, end_t)
-    elif hasattr(clip, 'subclipped'):
-        return clip.subclipped(start_t, end_t)
-    return clip
-
-
-def loop_audio(audio_clip, target_duration: float):
-    if hasattr(audio_clip, 'loop'):
-        return audio_clip.loop(duration=target_duration)
-    elif hasattr(audio_clip, 'audio_loop'):
-        return audio_clip.audio_loop(duration=target_duration)
-    return audio_clip
-
-
-def create_gradient(width: int, height: int, color1: tuple, color2: tuple) -> Image.Image:
-    base = Image.new("RGBA", (width, height), color1)
-    top = Image.new("RGBA", (width, height), color2)
-    mask = Image.new("L", (width, height))
-    mask_draw = ImageDraw.Draw(mask)
-    for y in range(height):
-        alpha = int(255 * (y / height))
-        mask_draw.line([(0, y), (width, y)], fill=alpha)
-    base.paste(top, (0, 0), mask)
-    return base
-
-
-def get_reel_fonts():
-    try:
-        f_brand = ImageFont.truetype("arialbd.ttf", 108)
-        f_hook = ImageFont.truetype("arialbd.ttf", 92)
-        f_price = ImageFont.truetype("arialbd.ttf", 122)
-        f_cta = ImageFont.truetype("arialbd.ttf", 95)
-        f_sub = ImageFont.truetype("arial.ttf", 61)
-    except IOError:
-        f_brand = ImageFont.load_default()
-        f_hook = ImageFont.load_default()
-        f_price = ImageFont.load_default()
-        f_cta = ImageFont.load_default()
-        f_sub = ImageFont.load_default()
-    return f_brand, f_hook, f_price, f_cta, f_sub
-
-
-REEL_THEMES = [
-    {
-        "name": "ootd_look",
-        "bg_colors": ((248, 240, 235, 255), (250, 245, 235, 255)),
-        "card_bg": (255, 255, 255, 255),
-        "header_color": "#FFC832",
-        "cta_color": "#FFC832",
-        "text_color": "#111111",
-        "accent_color": "#333333",
-        "price_bg": "#FFC832",
-        "hooks": ["🔥 OOTD | SHOP THE LOOK", "✨ DAILY STYLE INSPO", "🎁 FREE SHIPPING TODAY"]
-    },
-    {
-        "name": "trending_now",
-        "bg_colors": ((235, 248, 240, 255), (235, 245, 250, 255)),
-        "card_bg": (255, 255, 255, 255),
-        "header_color": "#FF3264",
-        "cta_color": "#FF3264",
-        "text_color": "#111111",
-        "accent_color": "#222222",
-        "price_bg": "#FF3264",
-        "hooks": ["🔥 TRENDING | GET IT NOW", "⚡ VIRAL ON PINTEREST", "🎁 FREE SHIPPING INCLUDED"]
-    },
-    {
-        "name": "new_drop",
-        "bg_colors": ((30, 34, 42, 255), (45, 50, 60, 255)),
-        "card_bg": (255, 255, 255, 255),
-        "header_color": "#32C864",
-        "cta_color": "#32C864",
-        "text_color": "#FFFFFF",
-        "accent_color": "#111111",
-        "price_bg": "#32C864",
-        "hooks": ["✨ NEW DROP | SHOP BEFORE IT'S GONE", "🔥 FRESH ARRIVALS", "🎁 FAST & FREE SHIPPING"]
-    },
-    {
-        "name": "style_tips",
-        "bg_colors": ((240, 235, 248, 255), (240, 240, 248, 255)),
-        "card_bg": (255, 255, 255, 255),
-        "header_color": "#50A0FF",
-        "cta_color": "#50A0FF",
-        "text_color": "#111111",
-        "accent_color": "#222222",
-        "price_bg": "#50A0FF",
-        "hooks": ["💡 STYLE TIPS | SEE ALL STYLES", "⭐ TOP RATED 5.0 STARS", "🎁 FREE SHIPPING | SHOP NOW"]
-    },
-    {
-        "name": "fashion_steal",
-        "bg_colors": ((245, 238, 230, 255), (248, 240, 235, 255)),
-        "card_bg": (255, 255, 255, 255),
-        "header_color": "#FF8232",
-        "cta_color": "#FF8232",
-        "text_color": "#111111",
-        "accent_color": "#333333",
-        "price_bg": "#FF8232",
-        "hooks": ["💰 FASHION STEAL | GRAB THIS DEAL", "🔥 LIMITED TIME OFFER", "🎁 FREE SHIPPING | ORDER TODAY"]
-    },
-    {
-        "name": "romantic_era",
-        "bg_colors": ((248, 235, 240, 255), (253, 240, 240, 255)),
-        "card_bg": (255, 255, 255, 255),
-        "header_color": "#731E46",
-        "cta_color": "#731E46",
-        "text_color": "#111111",
-        "accent_color": "#4A142D",
-        "price_bg": "#731E46",
-        "hooks": ["💖 ROMANTIC ERA | ELEVATE YOUR LOOK", "✨ ESSENTIAL STYLE FAVORITE", "🎁 FREE SHIPPING | SHOP NOW"]
-    }
+# Boards preferred for video content
+VIDEO_PREFERRED_BOARDS = [
+    "Trends",
+    "Outfit Ideas",
+    "Style Ideas",
+    "Everyday Style",
+    "Chic & Effortless Styles",
+    "New Trendy Women Apparel, Shoes, Handbags & more",
+    "Simple Outfits",
+    "Ootd #ootd",
 ]
 
+# ---------------------------------------------------------------------------
+# Video build config (mirrors youtube_shorts.py)
+# ---------------------------------------------------------------------------
 
-def calculate_motion_params(t: float, effect: str):
-    scale = 1.0
-    if effect == "float":
-        return scale + (t * 0.02), 0, int(math.cos(t * 3) * 15), math.sin(t * 2) * 2
-    elif effect == "wobble":
-        return scale + (t * 0.02), int(math.cos(t * 4) * 12), 0, math.sin(t * 4) * 3
-    elif effect == "spin":
-        return scale + (t * 0.03), 0, 0, t * 4
-    elif effect == "zoom-float":
-        return scale + (t * 0.04), 0, int(math.cos(t * 2) * 10), math.sin(t * 2) * 2
-    else:
-        return scale + (t * 0.02), 0, 0, 0
+VIDEO_W, VIDEO_H  = 1080, 1920
+FPS               = 30
+CLIP_DURATION     = 5      # seconds per product image slide
+VOICEOVER_DURATION = 4     # max voiceover length in seconds
+OUT_DIR           = Path(tempfile.gettempdir())
+OUT_DIR.mkdir(exist_ok=True)
 
+FORMATS = [
+    {"badge": "OOTD",          "cta": "Shop The Look",        "badge_color": (255, 200, 50)},
+    {"badge": "TRENDING",      "cta": "Get It Now",            "badge_color": (255, 50, 100)},
+    {"badge": "NEW DROP",      "cta": "Shop Before It's Gone", "badge_color": (50, 200, 100)},
+    {"badge": "STYLE TIPS",    "cta": "See All Styles",        "badge_color": (80, 160, 255)},
+    {"badge": "FASHION STEAL", "cta": "Grab This Deal",        "badge_color": (255, 130, 50)},
+    {"badge": "STYLE INSPO",   "cta": "Get The Look",          "badge_color": (180, 80, 255)},
+    {"badge": "MUST HAVE",     "cta": "Add To Cart",           "badge_color": (210, 160, 140)},
+    {"badge": "ROMANTIC ERA",  "cta": "Elevate Your Look",     "badge_color": (115, 30, 70)},
+    {"badge": "VIBE CHECK",    "cta": "Shop The Vibe",         "badge_color": (70, 95, 120)},
+    {"badge": "DAILY RITUAL",  "cta": "Get The Look",          "badge_color": (60, 105, 80)},
+]
 
-def render_theme_frame(raw_img: Image.Image, slide_index: int, total_slides: int, step_index: int, max_steps: int, product: dict, brand_name: str, public_domain: str, theme: dict, effect_name: str) -> Image.Image:
-    width, height = 1080, 1920
-    canvas = create_gradient(width, height, theme["bg_colors"][0], theme["bg_colors"][1])
+SOLID_BG_COLORS = [
+    (248, 240, 235),  # warm cream
+    (240, 235, 248),  # soft lavender
+    (235, 248, 240),  # mint green
+    (248, 235, 240),  # blush pink
+    (235, 245, 250),  # sky blue
+    (250, 245, 235),  # peach
+    (240, 240, 248),  # periwinkle
+    (245, 238, 230),  # linen
+]
 
-    t = step_index / max_steps
-    scale_factor, offset_x, offset_y, angle = calculate_motion_params(t, effect_name)
-
-    card_w, card_h = 960, 1000
-    card_x, card_y = 60 + offset_x, 360 + offset_y
-
-    zoomed_w = max(10, int(raw_img.width * scale_factor))
-    zoomed_h = max(10, int(raw_img.height * scale_factor))
-    img_zoomed = raw_img.resize((zoomed_w, zoomed_h), Image.Resampling.LANCZOS)
-    img_zoomed.thumbnail((card_w - 40, card_h - 40), Image.Resampling.LANCZOS)
-
-    if angle != 0:
-        img_zoomed = img_zoomed.rotate(angle, resample=Image.BICUBIC, expand=True)
-
-    card = Image.new("RGBA", (card_w, card_h), theme["card_bg"])
-    zw, zh = img_zoomed.size
-    card.paste(img_zoomed, ((card_w - zw) // 2, (card_h - zh) // 2), img_zoomed)
-
-    canvas.paste(card, (card_x, card_y))
-    draw = ImageDraw.Draw(canvas)
-
-    f_brand, f_hook, f_price, f_cta, f_sub = get_reel_fonts()
-
-    title = product.get("title", "")
-    price = f"${product.get('price', '0.00')}"
-
-    draw.rounded_rectangle([40, 80, 1040, 220], radius=25, fill=theme["header_color"])
-    text_color = "#000000" if theme["header_color"] in ("#FFC832", "#32C864", "#FF8232", "#50A0FF") else "#FFFFFF"
-    draw.text((70, 95), f"✨ {brand_name}", fill=text_color, font=f_brand)
-
-    hook_text = theme["hooks"][min(slide_index, len(theme["hooks"]) - 1)]
-    draw.rounded_rectangle([40, 235, 1040, 345], radius=15, fill=theme["accent_color"])
-    draw.text((70, 250), hook_text, fill="white", font=f_hook)
-
-    price_text_color = "#000000" if theme["price_bg"] in ("#FFC832", "#32C864", "#FF8232", "#50A0FF") else "#FFFFFF"
-    draw.rounded_rectangle([580, 1370, 1040, 1510], radius=25, fill=theme["price_bg"])
-    draw.text((610, 1385), f"ONLY {price}", fill=price_text_color, font=f_price)
-
-    draw.rounded_rectangle([40, 1390, 560, 1490], radius=20, fill=(18, 22, 36, 230))
-    draw.text((60, 1410), "⭐ 5.0 (490+ Reviews)", fill="#FFD700", font=f_sub)
-
-    display_title = title if len(title) <= 26 else title[:24] + "..."
-    draw.rounded_rectangle([40, 1525, 1040, 1640], radius=25, fill=(0, 0, 0, 180))
-    draw.text((60, 1535), display_title, fill="#FFFFFF", font=f_hook)
-
-    draw.rounded_rectangle([40, 1660, 1040, 1820], radius=35, fill=theme["cta_color"])
-    cta_text_color = "#000000" if theme["cta_color"] in ("#FFC832", "#32C864", "#FF8232", "#50A0FF") else "#FFFFFF"
-    cta_display = f"🛒 SHOP: {public_domain.upper()}"
-    draw.text((80, 1690), cta_display, fill=cta_text_color, font=f_cta)
-
-    progress_w = int(1080 * ((slide_index + 1) / total_slides))
-    draw.rectangle([0, 0, progress_w, 15], fill="#FFD700")
-
-    return canvas.convert("RGB")
+# Font paths (CI = Linux, local = Windows)
+import platform
+if platform.system() == "Windows":
+    _FONT_BOLD = "C:/Windows/Fonts/arialbd.ttf"
+    _FONT_REG  = "C:/Windows/Fonts/arial.ttf"
+else:
+    _FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    _FONT_REG  = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
 
-def _pick_audio_track() -> str:
-    search_paths = [
-        Path(__file__).resolve().parent.parent / "audio",
-        Path(__file__).resolve().parent / "audio",
-        Path("audio")
-    ]
-    tracks = []
-    for dir_path in search_paths:
-        if dir_path.exists() and dir_path.is_dir():
-            tracks.extend(list(dir_path.glob("*.mp3")) + list(dir_path.glob("*.wav")))
+def _font(size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
+    try:
+        return ImageFont.truetype(_FONT_BOLD if bold else _FONT_REG, size)
+    except Exception:
+        return ImageFont.load_default()
+
+
+# ---------------------------------------------------------------------------
+# History helpers
+# ---------------------------------------------------------------------------
+
+def _load_history() -> Dict[str, Any]:
+    if VIDEO_HISTORY_FILE.exists():
+        try:
+            return json.loads(VIDEO_HISTORY_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {"posts": []}
+
+
+def _save_history(history: Dict[str, Any]) -> None:
+    VIDEO_HISTORY_FILE.write_text(
+        json.dumps(history, indent=2, default=str), encoding="utf-8"
+    )
+
+
+def _was_recently_posted(product: Dict[str, Any], video_history: Dict[str, Any]) -> bool:
+    product_handle = product.get("handle", "")
+    product_id = str(product.get("id", ""))
     
+    cutoff = datetime.now(timezone.utc) - timedelta(days=VIDEO_REPOST_COOLDOWN_DAYS)
+    
+    # 1. Check video history (by handle or ID)
+    for post in video_history.get("posts", []):
+        post_handle = post.get("product_handle")
+        post_id = str(post.get("product_id", ""))
+        if (post_handle and post_handle == product_handle) or (post_id and post_id == product_id):
+            try:
+                posted_at = datetime.fromisoformat(post["posted_at"])
+                if posted_at.tzinfo is None:
+                    posted_at = posted_at.replace(tzinfo=timezone.utc)
+                if posted_at > cutoff:
+                    return True
+            except Exception:
+                pass
+
+    # 2. Check other history files
+    history_files = [
+        ("posting_history_v2.json", "posts", "timestamp"),
+        ("refresh_history_v2.json", "refreshes", "timestamp"),
+        ("posting_history.json", "posts", "timestamp"),
+        ("refresh_history.json", "refreshes", "timestamp"),
+        ("blog_posting_history.json", "posts", "timestamp"),
+    ]
+    
+    for filename, list_key, time_key in history_files:
+        path = Path(__file__).parent / filename
+        if path.exists():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                for item in data.get(list_key, []):
+                    item_id = str(item.get("product_id") or item.get("id") or "")
+                    item_handle = item.get("product_handle") or item.get("handle")
+                    if (item_id and item_id == product_id) or (item_handle and item_handle == product_handle):
+                        ts_str = item.get(time_key) or item.get("posted_at")
+                        if ts_str:
+                            ts = datetime.fromisoformat(ts_str)
+                            if ts.tzinfo is None:
+                                ts = ts.replace(tzinfo=timezone.utc)
+                            if ts > cutoff:
+                                return True
+            except Exception as e:
+                logger.warning(f"Error reading history file {filename}: {e}")
+                
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Frame / video building (adapted from youtube_shorts.py)
+# ---------------------------------------------------------------------------
+
+def _solid_bg(color: tuple, w: int = VIDEO_W, h: int = VIDEO_H) -> Image.Image:
+    img = Image.new("RGB", (w, h))
+    dr  = ImageDraw.Draw(img)
+    r0, g0, b0 = color
+    for y in range(h):
+        t = y / h
+        dr.line([(0, y), (w, y)], fill=(int(r0 - 15*t), int(g0 - 15*t), int(b0 - 15*t)))
+    return img
+
+
+def _load_product_image(url: str) -> Optional[Image.Image]:
+    try:
+        r = requests.get(url, timeout=30)
+        r.raise_for_status()
+        img = Image.open(io.BytesIO(r.content)).convert("RGB")
+        img = ImageEnhance.Color(img).enhance(1.22)
+        img = ImageEnhance.Contrast(img).enhance(1.08)
+        img = ImageEnhance.Sharpness(img).enhance(1.15)
+        img = ImageEnhance.Brightness(img).enhance(1.04)
+        return img
+    except Exception as e:
+        logger.warning(f"Could not load product image {url[:60]}: {e}")
+        return None
+
+
+def _compose_frame(
+    bg: Image.Image,
+    product_img: Image.Image,
+    title: str,
+    price: str,
+    url: str,
+    fmt: Dict,
+    product_scale: float = 1.0,
+    show_url: bool = False,
+    x_offset: float = 0.0,
+    y_offset: float = 0.0,
+    angle: float = 0.0,
+) -> Image.Image:
+    w, h   = VIDEO_W, VIDEO_H
+    canvas = bg.copy()
+
+    # Create the floating product card
+    pw, ph  = product_img.size
+    max_h   = h - 500
+    max_w   = int(w * 0.90)
+    base_sc = min(max_h / ph, max_w / pw)
+    cur_sc  = base_sc * product_scale
+    nw, nh  = max(1, int(pw * cur_sc)), max(1, int(ph * cur_sc))
+    
+    fg = product_img.resize((nw, nh), Image.LANCZOS)
+    
+    # Add a white border to the card
+    fg_with_border = Image.new("RGBA", (nw + 20, nh + 20), (255, 255, 255, 255))
+    fg_with_border.paste(fg, (10, 10))
+    
+    # Rotate
+    if angle != 0:
+        fg_with_border = fg_with_border.rotate(angle, resample=Image.BICUBIC, expand=True)
+    
+    # Paste centered with offset
+    fw, fh = fg_with_border.size
+    x_pos = (w - fw) // 2 + int(x_offset)
+    y_pos = (h - fh) // 2 + int(y_offset)
+    
+    canvas.paste(fg_with_border, (x_pos, y_pos), fg_with_border)
+
+    # Transparent center overlay for text (Template N style)
+    box_w = int(w * 0.85)
+    box_h = int(h * 0.35)
+    box_x = (w - box_w) // 2
+    box_y = (h - box_h) // 2
+
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    od = ImageDraw.Draw(overlay)
+    od.rounded_rectangle([box_x, box_y, box_x + box_w, box_y + box_h], radius=20, fill=(0, 0, 0, 90))
+    
+    cvs = canvas.convert("RGBA")
+    cvs.alpha_composite(overlay)
+    img = cvs.convert("RGB")
+    draw = ImageDraw.Draw(img)
+
+    # Category / Badge
+    draw.text((w // 2, box_y + int(box_h * 0.15)), fmt["badge"], fill="white", font=_font(int(box_h * 0.06)), anchor="mm")
+
+    # Title
+    for i, line in enumerate(textwrap.wrap(title, 34)[:2]):
+        draw.text((w // 2, box_y + int(box_h * 0.40) + i * int(box_h * 0.12)), line, fill="white", font=_font(int(box_h * 0.08)), anchor="mm")
+
+    # Price
+    if price:
+        draw.text((w // 2, box_y + int(box_h * 0.8)), f"${price}", fill=(255, 127, 80), font=_font(int(box_h * 0.09)), anchor="mm")
+
+    # URL bar (last frame only)
+    if show_url:
+        short = url.replace("https://", "").split("?")[0][:44]
+        draw.rounded_rectangle([(35, h-62), (w-35, h-14)], radius=14, fill=(255, 255, 255, 190))
+        draw.text((w//2, h-38), short, font=_font(22, bold=False), fill=(0, 70, 180), anchor="mm")
+
+    return img
+
+
+def _save_thumbnail(frame_img: Image.Image, handle: str) -> str:
+    """Save first composed frame as a JPEG thumbnail. Returns path."""
+    thumb_path = str(OUT_DIR / f"{handle[:30]}_thumb.jpg")
+    frame_img.convert("RGB").save(thumb_path, "JPEG", quality=92)
+    logger.info(f"Thumbnail saved: {thumb_path}")
+    return thumb_path
+
+
+def _pick_music_track() -> Optional[str]:
+    """Pick a random MP3 from audio folder. Returns path or None."""
+    if not _AUDIO_DIR.exists():
+        return None
+    tracks = [f for f in glob.glob(str(_AUDIO_DIR / "*.mp3"))
+              if os.path.getsize(f) > 50_000]
     if tracks:
-        selected = str(random.choice(tracks))
-        logger.info("Selected background music track: %s", os.path.basename(selected))
-        return selected
-    logger.warning("No audio tracks found in audio/ directory.")
+        return random.choice(tracks)
     return None
 
 
-def generate_reel_video(product: dict, output_path: str = "output/generated_reel.mp4", theme_index: int = None) -> str:
-    if ImageSequenceClip is None:
-        raise ImportError("moviepy is required for video generation. Run: pip install moviepy==1.0.3")
+def _static_frame_clip(
+    frame_img: Image.Image,
+    duration: float,
+) -> VideoClip:
+    """Create a static video clip from a single PIL image."""
+    frame_array = np.array(frame_img)
+    return VideoClip(lambda t: frame_array, duration=duration).set_fps(FPS)
 
+
+def _slide_clip(
+    bg: Image.Image,
+    product_img: Image.Image,
+    title: str,
+    price: str,
+    url: str,
+    fmt: Dict,
+    effect: str,
+    show_url: bool = False,
+) -> VideoClip:
+    import math
+    
+    # Background is already blurred and prepared
+    bg_r = bg
+
+    def _params(t: float):
+        scale = 0.95
+        if effect == "float":
+            return scale, 0, math.cos(t * 2) * 20, math.sin(t * 2) * 3
+        elif effect == "wobble":
+            return scale, math.cos(t * 3) * 15, 0, math.sin(t * 4) * 4
+        elif effect == "spin":
+            return scale + (t * 0.02), 0, 0, t * 5
+        elif effect == "zoom-float":
+            return scale + (t * 0.03), 0, math.cos(t) * 10, math.sin(t) * 2
+        else:
+            return scale, 0, 0, math.sin(t * 2) * 3
+
+    def make_frame(t: float):
+        scale, ox, oy, angle = _params(t)
+        frame = _compose_frame(bg_r, product_img, title, price, url, fmt,
+                               product_scale=scale,
+                               show_url=(show_url and t > CLIP_DURATION - 0.5),
+                               x_offset=ox, y_offset=oy, angle=angle)
+        return np.array(frame)
+
+    return VideoClip(make_frame, duration=CLIP_DURATION).set_fps(FPS)
+
+
+def build_video(product: Dict, fmt: Dict, bg_colors: List[tuple], store_base_url: str) -> Optional[Tuple[str, str]]:
+    """
+    Build a 30s product slideshow mp4 from Shopify product images.
+    Returns tuple (video_path, thumbnail_path) or None on failure.
+    """
+    title  = product["title"]
+    price  = product.get("variants", [{}])[0].get("price", "0")
+    handle = product.get("handle", "")
+    url    = f"{store_base_url.rstrip('/')}/products/{handle}?utm_source=pinterest&utm_medium=video&utm_campaign={BRAND_NAME.lower()}"
+
+    images = product.get("images", [])[:6]
+    if not images:
+        logger.error(f"No images for product {title}")
+        return None
+    # Pad to 6 if fewer images available
+    while len(images) < 6:
+        images = (images * 2)[:6]
+
+    logger.info(f"Building video: {title[:50]} ({len(images)} slides)")
+
+    effects = ["float", "wobble", "spin", "zoom-float"]
+    clips   = []
+    thumb_path = None
+    intro_clip = None
+
+    for i, img_data in enumerate(images):
+        prod_img = _load_product_image(img_data["src"])
+        if prod_img is None:
+            continue
+            
+        from PIL import ImageFilter
+        bg_r = prod_img.resize((VIDEO_W, VIDEO_H), Image.LANCZOS).filter(ImageFilter.GaussianBlur(30)).point(lambda p: p * 0.6)
+        
+        effect   = effects[i % len(effects)]
+        show_url = (i == len(images) - 1)
+        clip     = _slide_clip(bg_r, prod_img, title, price, url, fmt, effect, show_url)
+        clip     = clip.fadein(0.1).fadeout(0.1)
+        clips.append(clip)
+
+        # Create intro frame (static 2s full product) from first image
+        if intro_clip is None:
+            intro_frame_img = _compose_frame(bg_r, prod_img, title, price, url, fmt, product_scale=1.0, show_url=False)
+            intro_clip = _static_frame_clip(intro_frame_img, duration=2.0).fadeout(0.3)
+            thumb_path = _save_thumbnail(intro_frame_img, handle)
+
+    if not clips:
+        logger.error("No clips built — all product images failed to load")
+        return None
+
+    # Prepend intro (2s static full product) + animated clips
+    if intro_clip:
+        clips = [intro_clip] + clips
+
+    video       = concatenate_videoclips(clips, method="compose")
+    total_secs  = video.duration
+    audio_clips = []
+
+    # Background music
+    music_path = _pick_music_track()
+    if music_path:
+        bg_aud = AudioFileClip(music_path).volumex(0.35)
+        if bg_aud.duration < total_secs:
+            bg_aud = bg_aud.audio_loop(duration=total_secs)
+        else:
+            bg_aud = bg_aud.subclip(0, total_secs)
+        audio_clips.append(bg_aud)
+        logger.info(f"Background music: {os.path.basename(music_path)}")
+
+    # Voiceover (gTTS) — overlaid at end as CTA
+    vo_text = (
+        f"Discover the {title} at {BRAND_NAME} — only ${price}! "
+        f"Shop the link in description now!"
+    )
+    try:
+        pass
+    except Exception:
+        pass
+
+    with tempfile.TemporaryDirectory() as tmp:
+        vo_path = os.path.join(tmp, "vo.mp3")
+        try:
+            gTTS(text=vo_text, lang="en", tld="us").save(vo_path)
+            vo = AudioFileClip(vo_path)
+            if vo.duration > VOICEOVER_DURATION:
+                vo = vo.subclip(0, VOICEOVER_DURATION)
+            vo_start = max(0, total_secs - vo.duration - 1.0)
+            audio_clips.append(vo.set_start(vo_start).volumex(1.1))
+            logger.info(f"Voiceover: {vo.duration:.1f}s starting at {vo_start:.1f}s (end CTA)")
+        except Exception as e:
+            logger.warning(f"gTTS voiceover failed: {e}")
+
+        if audio_clips:
+            video = video.set_audio(CompositeAudioClip(audio_clips))
+
+        out_path = str(OUT_DIR / f"{handle[:30]}_{int(time.time())}.mp4")
+        logger.info(f"Rendering → {out_path}")
+        video.write_videofile(
+            out_path, fps=FPS, codec="libx264", audio_codec="aac",
+            temp_audiofile=os.path.join(tmp, "tmp_audio.m4a"),
+            remove_temp=True, verbose=False, logger=None,
+            ffmpeg_params=["-crf", "18", "-preset", "fast", "-b:a", "192k"],
+        )
+
+    video.close()
+    size_mb = os.path.getsize(out_path) / 1_048_576
+    logger.info(f"Rendered: {os.path.basename(out_path)} ({size_mb:.1f} MB)")
+    if size_mb > MAX_VIDEO_SIZE_MB:
+        logger.error(f"Video too large ({size_mb:.1f} MB > {MAX_VIDEO_SIZE_MB} MB) — skipping")
+        os.unlink(out_path)
+        if thumb_path and os.path.exists(thumb_path):
+            os.unlink(thumb_path)
+        return None
+
+    return (out_path, thumb_path)
+
+def generate_reel_video(product: dict, output_path: str = "output/generated_reel.mp4", theme_index: int = None) -> str:
     brand_name = get_secret("BRAND_NAME", default="MEEESHOP").upper()
     public_domain = get_secret("PUBLIC_STORE_DOMAIN", default="us.meeeshop.com")
     
-    title = product.get("title", "Featured Item")
-    price = product.get("price", "0.00")
-
-    img_urls = product.get("images", [])[:3]
-    if not img_urls:
-        raise ValueError("Product has no images available for video reel generation.")
-
-    if theme_index is None or not (0 <= theme_index < len(REEL_THEMES)):
-        theme = random.choice(REEL_THEMES)
-    else:
-        theme = REEL_THEMES[theme_index]
-
-    effects = ["float", "wobble", "spin", "zoom-float"]
-    selected_effect = random.choice(effects)
-    logger.info("Selected Video Reel Theme: '%s' | Motion Effect: '%s'", theme["name"], selected_effect)
-
-    temp_dir = "temp_reel_frames"
-    os.makedirs(temp_dir, exist_ok=True)
-    all_frame_files = []
-
-    try:
-        frame_counter = 0
-        total_slides = len(img_urls)
-        frames_per_slide = 15
-
-        for slide_idx, url in enumerate(img_urls):
-            res = requests.get(url, timeout=15)
-            res.raise_for_status()
-            raw_img = Image.open(BytesIO(res.content)).convert("RGBA")
-
-            for step in range(frames_per_slide):
-                frame_img = render_theme_frame(
-                    raw_img=raw_img,
-                    slide_index=slide_idx,
-                    total_slides=total_slides,
-                    step_index=step,
-                    max_steps=frames_per_slide,
-                    product=product,
-                    brand_name=brand_name,
-                    public_domain=public_domain,
-                    theme=theme,
-                    effect_name=selected_effect
-                )
-
-                frame_path = os.path.join(temp_dir, f"frame_{frame_counter:04d}.jpg")
-                frame_img.save(frame_path, "JPEG", quality=95)
-                all_frame_files.append(frame_path)
-                frame_counter += 1
-
-        clip = ImageSequenceClip(all_frame_files, fps=12)
-        total_duration = clip.duration
-
-        # ── AUDIO MIXING ENGINE ──────────────────────────────────────────────
-        audio_tracks = []
-
-        # 1. Background Music (30% volume)
-        music_file = _pick_audio_track()
-        if music_file:
-            try:
-                bg_music = set_volume(AudioFileClip(music_file), 0.30)
-                if bg_music.duration < total_duration:
-                    bg_music = loop_audio(bg_music, total_duration)
-                else:
-                    bg_music = trim_clip(bg_music, 0, total_duration)
-                audio_tracks.append(bg_music)
-                logger.info("Mixed background music track into Reel.")
-            except Exception as e:
-                logger.warning("Failed to mix background music: %s", str(e))
-
-        # 2. Text-to-Speech Voiceover (gTTS)
-        try:
-            from gtts import gTTS
-            vo_text = f"Discover the {title} at {brand_name} for only ${price}! Tap the link now for free shipping on all orders!"
-            vo_temp_dir = tempfile.mkdtemp()
-            vo_path = os.path.join(vo_temp_dir, "voiceover.mp3")
-            
-            gTTS(text=vo_text, lang="en", tld="us").save(vo_path)
-            vo_audio = set_volume(AudioFileClip(vo_path), 1.15)
-            
-            if vo_audio.duration > total_duration:
-                vo_audio = trim_clip(vo_audio, 0, total_duration)
-                
-            audio_tracks.append(vo_audio)
-            logger.info("Successfully generated and mixed voiceover audio (gTTS).")
-        except Exception as e:
-            logger.warning("Voiceover generation skipped or failed: %s", str(e))
-
-        # Combine audio tracks into clip
-        if audio_tracks:
-            clip = attach_audio(clip, CompositeAudioClip(audio_tracks))
-
+    fmt = FORMATS[theme_index % len(FORMATS)] if theme_index is not None else random.choice(FORMATS)
+    bg_colors = SOLID_BG_COLORS
+    
+    # ensure images are properly formatted
+    if "images" in product and product["images"] and isinstance(product["images"][0], str):
+        product["images"] = [{"src": url} for url in product["images"]]
+        
+    result = build_video(product, fmt, bg_colors, public_domain)
+    if result:
+        out_path, thumb = result
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-        clip.write_videofile(
-            output_path, 
-            fps=24, 
-            codec="libx264", 
-            audio_codec="aac", 
-            temp_audiofile="temp_audio.m4a",
-            remove_temp=True, 
-            logger=None
-        )
-
-        logger.info("Successfully generated video Reel with Audio & Voiceover (%s): %s", theme['name'], output_path)
+        import shutil
+        shutil.move(out_path, output_path)
         return output_path
-
-    finally:
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir, ignore_errors=True)
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    print("Multi-theme Reel video generator with Motion Effects, Audio & Voiceover ready.")
+    return None
