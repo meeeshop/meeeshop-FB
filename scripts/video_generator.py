@@ -86,11 +86,11 @@ def create_gradient(width: int, height: int, color1: tuple, color2: tuple) -> Im
 
 def get_reel_fonts():
     try:
-        f_brand = ImageFont.truetype("arialbd.ttf", 46)
-        f_hook = ImageFont.truetype("arialbd.ttf", 36)
-        f_price = ImageFont.truetype("arialbd.ttf", 48)
-        f_cta = ImageFont.truetype("arialbd.ttf", 38)
-        f_sub = ImageFont.truetype("arial.ttf", 26)
+        f_brand = ImageFont.truetype("arialbd.ttf", 64)
+        f_hook = ImageFont.truetype("arialbd.ttf", 54)
+        f_price = ImageFont.truetype("arialbd.ttf", 72)
+        f_cta = ImageFont.truetype("arialbd.ttf", 56)
+        f_sub = ImageFont.truetype("arial.ttf", 36)
     except IOError:
         f_brand = ImageFont.load_default()
         f_hook = ImageFont.load_default()

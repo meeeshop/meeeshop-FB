@@ -38,12 +38,12 @@ def create_gradient(width: int, height: int, color1: tuple, color2: tuple) -> Im
 def get_fonts():
     """Load standard fonts with fallback."""
     try:
-        font_brand = ImageFont.truetype("arialbd.ttf", 34)
-        font_title = ImageFont.truetype("arialbd.ttf", 30)
-        font_price = ImageFont.truetype("arialbd.ttf", 40)
-        font_small = ImageFont.truetype("arial.ttf", 24)
-        font_badge = ImageFont.truetype("arialbd.ttf", 26)
-        font_cta = ImageFont.truetype("arialbd.ttf", 34)
+        font_brand = ImageFont.truetype("arialbd.ttf", 52)
+        font_title = ImageFont.truetype("arialbd.ttf", 48)
+        font_price = ImageFont.truetype("arialbd.ttf", 64)
+        font_small = ImageFont.truetype("arial.ttf", 34)
+        font_badge = ImageFont.truetype("arialbd.ttf", 38)
+        font_cta = ImageFont.truetype("arialbd.ttf", 50)
     except IOError:
         font_brand = ImageFont.load_default()
         font_title = ImageFont.load_default()
