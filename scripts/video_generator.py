@@ -258,9 +258,7 @@ def _compose_frame(
     for i, line in enumerate(textwrap.wrap(title, 34)[:2]):
         draw.text((w // 2, box_y + int(box_h * 0.40) + i * int(box_h * 0.12)), line, fill="white", font=_font(int(box_h * 0.08)), anchor="mm")
 
-    # Price
-    if price:
-        draw.text((w // 2, box_y + int(box_h * 0.8)), f"${price}", fill=(255, 127, 80), font=_font(int(box_h * 0.09)), anchor="mm")
+    # Price removed from video frame (included in caption description only)
 
     # URL bar (last frame only)
     if show_url:
