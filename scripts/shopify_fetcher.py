@@ -59,8 +59,13 @@ def select_random_product(products: list = None) -> dict:
     product = random.choice(products)
     title = product.get("title", "Featured Product")
     handle = product.get("handle", "")
-    images = [img["src"] for img in product.get("images", [])]
+    images = [img["src"] for img in product.get("images", []) if isinstance(img, dict) and img.get("src")]
     variants = product.get("variants", [])
+    for v in variants:
+        if isinstance(v, dict):
+            feat = v.get("featured_image")
+            if isinstance(feat, dict) and feat.get("src") and feat["src"] not in images:
+                images.append(feat["src"])
     price = variants[0].get("price", "0.00") if variants else "0.00"
     compare_at_price = variants[0].get("compare_at_price", None) if variants else None
     
