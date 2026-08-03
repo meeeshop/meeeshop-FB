@@ -1,6 +1,18 @@
 # Environment files containing local keys or decrypted secrets
 .env
+.env.*
+*.env
+.env.local
+.env.*.local
+key.txt
+*.key
+*.pem
+.enc.txt
+client_secret*.json
+credentials.json
 decrypted_secrets.json
+secrets.yaml
+config.json
 
 # Python bytecode / cache
 __pycache__/
@@ -11,13 +23,20 @@ __pycache__/
 env/
 venv/
 
-# Generated temporary media output
+# Generated temporary media & debug logs/screenshots
 temp_frames/
 temp_reel_frames/
 temp_audio.m4a
 generated_post.png
 generated_reel.mp4
 output/
+*.log
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.html
 
 # OS metadata
 .DS_Store
