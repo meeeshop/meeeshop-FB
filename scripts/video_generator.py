@@ -4,6 +4,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import requests
+try:
+    from gtts import gTTS
+except ImportError:
+    gTTS = None
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageFilter
 from moviepy.editor import AudioFileClip, CompositeAudioClip, VideoClip, concatenate_videoclips
 import logging
@@ -93,11 +97,35 @@ else:
     _FONT_REG  = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
 
-def _font(size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
-    try:
-        return ImageFont.truetype(_FONT_BOLD if bold else _FONT_REG, size)
-    except Exception:
-        return ImageFont.load_default()
+def _font(size: int, bold: bool = True, script: bool = False, serif: bool = False, italic: bool = False) -> ImageFont.FreeTypeFont:
+    if script or italic:
+        candidates = [
+            "C:/Windows/Fonts/georgiai.ttf",
+            "C:/Windows/Fonts/timesi.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-BoldItalic.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Italic.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf",
+        ]
+    elif serif:
+        candidates = [
+            "C:/Windows/Fonts/georgia.ttf",
+            "C:/Windows/Fonts/times.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
+        ]
+    else:
+        candidates = [
+            _FONT_BOLD if bold else _FONT_REG,
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf",
+        ]
+    for p in candidates:
+        try:
+            return ImageFont.truetype(p, size)
+        except Exception:
+            pass
+    return ImageFont.load_default()
 
 
 # ---------------------------------------------------------------------------
@@ -186,9 +214,12 @@ def _solid_bg(color: tuple, w: int = VIDEO_W, h: int = VIDEO_H) -> Image.Image:
 
 def _load_product_image(url: str) -> Optional[Image.Image]:
     try:
-        r = requests.get(url, timeout=30)
-        r.raise_for_status()
-        img = Image.open(io.BytesIO(r.content)).convert("RGB")
+        if url.startswith("http://") or url.startswith("https://"):
+            r = requests.get(url, timeout=30)
+            r.raise_for_status()
+            img = Image.open(io.BytesIO(r.content)).convert("RGB")
+        else:
+            img = Image.open(url).convert("RGB")
         img = ImageEnhance.Color(img).enhance(1.22)
         img = ImageEnhance.Contrast(img).enhance(1.08)
         img = ImageEnhance.Sharpness(img).enhance(1.15)
@@ -212,6 +243,10 @@ def _compose_frame(
     y_offset: float = 0.0,
     angle: float = 0.0,
 ) -> Image.Image:
+    """
+    Compose video frame: Render plain crisp warm cream text directly on product video frame.
+    ZERO background boxes, ZERO cards, ZERO gradient rectangles!
+    """
     w, h   = VIDEO_W, VIDEO_H
     canvas = bg.copy()
 
@@ -236,35 +271,38 @@ def _compose_frame(
     else:
         canvas.paste(fg, (x_pos, y_pos))
 
-    # Transparent center overlay for text (Template N style)
-    box_w = int(w * 0.85)
-    box_h = int(h * 0.35)
-    box_x = (w - box_w) // 2
-    box_y = (h - box_h) // 2
-
-    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    od = ImageDraw.Draw(overlay)
-    od.rounded_rectangle([box_x, box_y, box_x + box_w, box_y + box_h], radius=20, fill=(0, 0, 0, 90))
-    
-    cvs = canvas.convert("RGBA")
-    cvs.alpha_composite(overlay)
-    img = cvs.convert("RGB")
+    img = canvas.convert("RGB")
     draw = ImageDraw.Draw(img)
 
-    # CTA / Badge
-    draw.text((w // 2, box_y + int(box_h * 0.15)), fmt.get("cta", "SHOP NOW").upper(), fill="white", font=_font(int(box_h * 0.06)), anchor="mm")
+    CREAM_WHITE = (250, 248, 244)
+    SHADOW_DARK = (15, 15, 15)
 
-    # Title
-    for i, line in enumerate(textwrap.wrap(title, 34)[:2]):
-        draw.text((w // 2, box_y + int(box_h * 0.40) + i * int(box_h * 0.12)), line, fill="white", font=_font(int(box_h * 0.08)), anchor="mm")
+    def draw_direct_text(pos, text, font, fill=CREAM_WHITE, anchor="mm"):
+        x, y = pos
+        for dx, dy in [(-2,0), (2,0), (0,-2), (0,2), (-1,-1), (1,1), (-1,1), (1,-1)]:
+            draw.text((x + dx, y + dy), text, fill=SHADOW_DARK, font=font, anchor=anchor)
+        draw.text((x, y), text, fill=fill, font=font, anchor=anchor)
 
-    # Price removed from video frame (included in caption description only)
+    # Line 1: Top handwritten script hook ("Trending:" / badge) directly on frame
+    script_f = _font(54, bold=False, script=True)
+    badge_title = f"{fmt.get('badge', 'OOTD')}:"
+    draw_direct_text((w // 2, int(h * 0.12)), badge_title, script_f, anchor="mm")
 
-    # URL bar (last frame only)
-    if show_url:
-        short = url.replace("https://", "").split("?")[0][:44]
-        draw.rounded_rectangle([(35, h-62), (w-35, h-14)], radius=14, fill=(255, 255, 255, 190))
-        draw.text((w//2, h-38), short, font=_font(22, bold=False), fill=(0, 70, 180), anchor="mm")
+    # Line 2: Product Title directly on frame
+    title_f = _font(40, bold=True)
+    lines = textwrap.wrap(title, 26)[:2]
+    for i, line in enumerate(lines):
+        draw_direct_text((w // 2, int(h * 0.18) + i * 48), line.upper(), title_f, fill=CREAM_WHITE, anchor="mm")
+
+    # Price directly on frame if available
+    if price:
+        price_f = _font(38, bold=True)
+        draw_direct_text((w // 2, int(h * 0.88)), f"${price}", price_f, fill=CREAM_WHITE, anchor="mm")
+
+    # Bottom minimal CTA directly on frame
+    cta_f = _font(24, bold=True)
+    cta_text = "SHOP NOW AT US.MEEESHOP.COM" if show_url else "SHOP NOW ★ US.MEEESHOP.COM"
+    draw_direct_text((w // 2, int(h * 0.94)), cta_text, cta_f, fill=CREAM_WHITE, anchor="mm")
 
     return img
 
@@ -421,13 +459,14 @@ def build_video(product: Dict, fmt: Dict, bg_colors: List[tuple], store_base_url
     with tempfile.TemporaryDirectory() as tmp:
         vo_path = os.path.join(tmp, "vo.mp3")
         try:
-            gTTS(text=vo_text, lang="en", tld="us").save(vo_path)
-            vo = AudioFileClip(vo_path)
-            if vo.duration > VOICEOVER_DURATION:
-                vo = vo.subclip(0, VOICEOVER_DURATION)
-            vo_start = max(0, total_secs - vo.duration - 1.0)
-            audio_clips.append(vo.set_start(vo_start).volumex(1.1))
-            logger.info(f"Voiceover: {vo.duration:.1f}s starting at {vo_start:.1f}s (end CTA)")
+            if gTTS is not None:
+                gTTS(text=vo_text, lang="en", tld="us").save(vo_path)
+                vo = AudioFileClip(vo_path)
+                if vo.duration > VOICEOVER_DURATION:
+                    vo = vo.subclip(0, VOICEOVER_DURATION)
+                vo_start = max(0, total_secs - vo.duration - 1.0)
+                audio_clips.append(vo.set_start(vo_start).volumex(1.1))
+                logger.info(f"Voiceover: {vo.duration:.1f}s starting at {vo_start:.1f}s (end CTA)")
         except Exception as e:
             logger.warning(f"gTTS voiceover failed: {e}")
 
@@ -442,8 +481,12 @@ def build_video(product: Dict, fmt: Dict, bg_colors: List[tuple], store_base_url
             remove_temp=True, verbose=False, logger=None,
             ffmpeg_params=["-crf", "18", "-preset", "fast", "-b:a", "192k"],
         )
-
-    video.close()
+        video.close()
+        for ac in audio_clips:
+            try:
+                ac.close()
+            except Exception:
+                pass
     size_mb = os.path.getsize(out_path) / 1_048_576
     logger.info(f"Rendered: {os.path.basename(out_path)} ({size_mb:.1f} MB)")
     if size_mb > MAX_VIDEO_SIZE_MB:

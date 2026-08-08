@@ -46,8 +46,16 @@ BLUSH      = (230, 185, 175)
 
 # ── Font helpers ─────────────────────────────────────────────────────────────
 
-def _get_font(size: int, bold: bool = False, serif: bool = False) -> ImageFont.FreeTypeFont:
-    if serif:
+def _get_font(size: int, bold: bool = False, serif: bool = False, script: bool = False, italic: bool = False) -> ImageFont.FreeTypeFont:
+    if script or italic:
+        candidates = [
+            "C:/Windows/Fonts/georgiai.ttf",
+            "C:/Windows/Fonts/timesi.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-BoldItalic.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Italic.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf",
+        ]
+    elif serif:
         candidates = (
             [
                 "C:/Windows/Fonts/georgiab.ttf",
@@ -879,37 +887,42 @@ def _template_m(draw, canvas, photo, title, category, price):
 
 
 def _template_n(draw, canvas, photo, title, category, price, cta):
-    p = _fit_image(photo, PIN_W, PIN_H)
+    """
+    Direct Photo Pin/Post Layout: Render warm cream white text directly on top of the product photo.
+    ZERO background boxes, ZERO translucent white overlays!
+    """
+    p = _boost(_fit_image(photo, PIN_W, PIN_H))
     canvas.paste(p, (0, 0))
-    
-    # Center semi-transparent overlay
-    overlay_h = int(PIN_H * 0.35)
-    overlay_y = (PIN_H - overlay_h) // 2
-    overlay = Image.new("RGBA", (PIN_W, PIN_H), (0, 0, 0, 0))
-    odraw = ImageDraw.Draw(overlay)
-    odraw.rectangle([0, overlay_y, PIN_W, overlay_y + overlay_h], fill=(255, 255, 255, 220))
-    canvas.paste(overlay, (0, 0), overlay)
+    draw = ImageDraw.Draw(canvas)
 
-    center_y = overlay_y + 30
-    
-    # Category
-    cf = _get_font(24, bold=True)
-    cb = cf.getbbox(category.upper())
-    draw.text(((PIN_W - (cb[2]-cb[0])) // 2, center_y), category.upper(), fill=DARK_GREY, font=cf)
-    
-    # Title
+    CREAM_WHITE = (250, 248, 244)
+    SHADOW_DARK = (15, 15, 15)
+
+    def draw_direct(pos, text, font, fill=CREAM_WHITE, anchor="mm"):
+        x, y = pos
+        for dx, dy in [(-2,0), (2,0), (0,-2), (0,2), (-1,-1), (1,1), (-1,1), (1,-1)]:
+            draw.text((x + dx, y + dy), text, fill=SHADOW_DARK, font=font, anchor=anchor)
+        draw.text((x, y), text, fill=fill, font=font, anchor=anchor)
+
+    # Line 1: Script Category Header
+    script_f = _get_font(54, bold=False, script=True)
+    draw_direct((PIN_W // 2, int(PIN_H * 0.10)), f"{category}:", script_f, fill=CREAM_WHITE, anchor="mm")
+
+    # Line 2: Product Title in bold uppercase
     tf = _get_font(42, bold=True)
-    lines = _wrap_text(title, tf, PIN_W - 80)
+    lines = _wrap_text(title.upper(), tf, int(PIN_W * 0.85))
     for i, line in enumerate(lines[:2]):
-        tb = tf.getbbox(line)
-        draw.text(((PIN_W - (tb[2]-tb[0])) // 2, center_y + 40 + i * 45), line, fill=BLACK, font=tf)
-        
-    # Price
+        draw_direct((PIN_W // 2, int(PIN_H * 0.17) + i * 48), line, tf, fill=CREAM_WHITE, anchor="mm")
+
+    # Line 3: Price Tag
     if price:
-        pf = _get_font(36, bold=True)
-        ps = f"${price}"
-        pb = pf.getbbox(ps)
-        draw.text(((PIN_W - (pb[2]-pb[0])) // 2, center_y + 40 + len(lines[:2]) * 45 + 10), ps, fill=RED, font=pf)
+        pf = _get_font(38, bold=True)
+        draw_direct((PIN_W // 2, int(PIN_H * 0.86)), f"${price}", pf, fill=CREAM_WHITE, anchor="mm")
+
+    # Line 4: Store CTA
+    cta_f = _get_font(24, bold=True)
+    cta_str = "SHOP NOW AT US.MEEESHOP.COM"
+    draw_direct((PIN_W // 2, PIN_H - 50), cta_str, cta_f, fill=CREAM_WHITE, anchor="mm")
 
 
 
@@ -966,19 +979,8 @@ def _prepare_photo_for_style(
         return _boost(composite)
 
     elif style == "card":
-        # Build Semi-Transparent Floating Card Overlay
-        p = _fit_image(photo, target_w, target_h)
-        card_overlay = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
-        cdraw = ImageDraw.Draw(card_overlay)
-
-        margin_x = int(target_w * 0.06)
-        card_h = int(target_h * 0.38)
-        card_y = target_h - card_h - int(target_h * 0.05)
-
-        _draw_rounded_rect(cdraw, (margin_x, card_y, target_w - margin_x, card_y + card_h), 16, (15, 15, 20, 210))
-        p_rgba = p.convert("RGBA")
-        composite = Image.alpha_composite(p_rgba, card_overlay).convert("RGB")
-        return _boost(composite)
+        # Direct hero photo framing (no card box overlay)
+        return _boost(_fit_image(photo, target_w, target_h))
 
     else:  # 'hero' style
         return _boost(_fit_image(photo, target_w, target_h))
@@ -1398,10 +1400,13 @@ def generate_post_image(product: dict, output_path: str = "output/generated_post
     image_url = img_urls[0] if isinstance(img_urls[0], str) else img_urls[0].get("src", "")
     
     import requests, tempfile
-    res = requests.get(image_url)
-    tmp_img = tempfile.mktemp(suffix=".jpg")
-    with open(tmp_img, "wb") as f:
-        f.write(res.content)
+    if image_url.startswith("http://") or image_url.startswith("https://"):
+        res = requests.get(image_url)
+        tmp_img = tempfile.mktemp(suffix=".jpg")
+        with open(tmp_img, "wb") as f:
+            f.write(res.content)
+    else:
+        tmp_img = image_url
         
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     
@@ -1412,7 +1417,7 @@ def generate_post_image(product: dict, output_path: str = "output/generated_post
         price=price,
         cta="SHOP NOW",
         output_path=output_path,
-        template_index=style_index or 0,
+        template_index=13 if style_index is None else style_index,
         board_name="FB Feed",
-        image_style="card"
+        image_style="hero"
     )
