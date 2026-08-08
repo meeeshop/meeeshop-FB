@@ -21,7 +21,7 @@ from typing import Optional, Tuple, List
 
 
 
-from PIL import Image, ImageDraw, ImageFont, ImageEnhance
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter
 
 logger = logging.getLogger(__name__)
 
@@ -888,11 +888,24 @@ def _template_m(draw, canvas, photo, title, category, price):
 
 def _template_n(draw, canvas, photo, title, category, price, cta):
     """
-    Direct Photo Pin/Post Layout: Render warm cream white text directly on top of the product photo.
+    Direct Photo Post Layout (matching video frame style):
+    Blurred product background layer + centered hero photo + direct warm cream white text overlay.
     ZERO background boxes, ZERO translucent white overlays!
     """
-    p = _boost(_fit_image(photo, PIN_W, PIN_H))
-    canvas.paste(p, (0, 0))
+    w, h = PIN_W, PIN_H
+    
+    # 1. Blurred background image layer
+    bg_blurred = photo.resize((w, h), Image.Resampling.LANCZOS).filter(ImageFilter.GaussianBlur(30))
+    bg_overlay = Image.new("RGBA", (w, h), (0, 0, 0, 75)) # subtle dark vignette for contrast
+    bg_final = Image.alpha_composite(bg_blurred.convert("RGBA"), bg_overlay)
+    canvas.paste(bg_final.convert("RGB"), (0, 0))
+
+    # 2. Centered main product photo
+    main_photo = _fit_image(photo, int(w * 0.88), int(h * 0.58))
+    px = (w - main_photo.width) // 2
+    py = int(h * 0.25)
+    canvas.paste(main_photo, (px, py))
+
     draw = ImageDraw.Draw(canvas)
 
     CREAM_WHITE = (250, 248, 244)
@@ -906,13 +919,14 @@ def _template_n(draw, canvas, photo, title, category, price, cta):
 
     # Line 1: Script Category Header
     script_f = _get_font(54, bold=False, script=True)
-    draw_direct((PIN_W // 2, int(PIN_H * 0.10)), f"{category}:", script_f, fill=CREAM_WHITE, anchor="mm")
+    header_text = f"{category}:" if category and category != "Facebook Spotlight" else "TRENDING:"
+    draw_direct((w // 2, int(h * 0.12)), header_text, script_f, fill=CREAM_WHITE, anchor="mm")
 
     # Line 2: Product Title in bold uppercase
-    tf = _get_font(42, bold=True)
-    lines = _wrap_text(title.upper(), tf, int(PIN_W * 0.85))
+    tf = _get_font(40, bold=True)
+    lines = _wrap_text(title.upper(), tf, int(w * 0.85))
     for i, line in enumerate(lines[:2]):
-        draw_direct((PIN_W // 2, int(PIN_H * 0.17) + i * 48), line, tf, fill=CREAM_WHITE, anchor="mm")
+        draw_direct((w // 2, int(h * 0.18) + i * 48), line, tf, fill=CREAM_WHITE, anchor="mm")
 
     # Line 3: Price Tag (only if valid non-zero price)
     try:
@@ -922,12 +936,12 @@ def _template_n(draw, canvas, photo, title, category, price, cta):
 
     if price_val > 0.01:
         pf = _get_font(38, bold=True)
-        draw_direct((PIN_W // 2, int(PIN_H * 0.86)), f"${price}", pf, fill=CREAM_WHITE, anchor="mm")
+        draw_direct((w // 2, int(h * 0.88)), f"${price}", pf, fill=CREAM_WHITE, anchor="mm")
 
-    # Line 4: Store CTA
+    # Line 4: Store CTA Prompt
     cta_f = _get_font(24, bold=True)
     cta_str = "SHOP NOW AT US.MEEESHOP.COM"
-    draw_direct((PIN_W // 2, PIN_H - 50), cta_str, cta_f, fill=CREAM_WHITE, anchor="mm")
+    draw_direct((w // 2, int(h * 0.94)), cta_str, cta_f, fill=CREAM_WHITE, anchor="mm")
 
 
 
