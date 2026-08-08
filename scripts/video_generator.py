@@ -294,8 +294,13 @@ def _compose_frame(
     for i, line in enumerate(lines):
         draw_direct_text((w // 2, int(h * 0.18) + i * 48), line.upper(), title_f, fill=CREAM_WHITE, anchor="mm")
 
-    # Price directly on frame if available
-    if price:
+    # Price directly on frame if valid and non-zero
+    try:
+        price_val = float(str(price).replace("$", "").strip()) if price else 0.0
+    except (ValueError, TypeError):
+        price_val = 0.0
+
+    if price_val > 0.01:
         price_f = _font(38, bold=True)
         draw_direct_text((w // 2, int(h * 0.88)), f"${price}", price_f, fill=CREAM_WHITE, anchor="mm")
 

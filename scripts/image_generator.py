@@ -914,8 +914,13 @@ def _template_n(draw, canvas, photo, title, category, price, cta):
     for i, line in enumerate(lines[:2]):
         draw_direct((PIN_W // 2, int(PIN_H * 0.17) + i * 48), line, tf, fill=CREAM_WHITE, anchor="mm")
 
-    # Line 3: Price Tag
-    if price:
+    # Line 3: Price Tag (only if valid non-zero price)
+    try:
+        price_val = float(str(price).replace("$", "").strip()) if price else 0.0
+    except (ValueError, TypeError):
+        price_val = 0.0
+
+    if price_val > 0.01:
         pf = _get_font(38, bold=True)
         draw_direct((PIN_W // 2, int(PIN_H * 0.86)), f"${price}", pf, fill=CREAM_WHITE, anchor="mm")
 
